@@ -1,0 +1,1855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll Tracker</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    :root {
+      --bg: #0a0e27;
+      --surface: #151932;
+      --surface-hover: #1d2342;
+      --border: #2a3254;
+      --text: #e4e7f5;
+      --text-dim: #8a91b8;
+      --accent: #00d9ff;
+      --accent-glow: rgba(0, 217, 255, 0.3);
+      --success: #00ff9d;
+      --warning: #ffb800;
+      --error: #ff4757;
+    }
+    
+    body {
+      font-family: 'DM Mono', monospace;
+      background: var(--bg);
+      color: var(--text);
+      padding: 0;
+      margin: 0;
+      min-height: 100vh;
+      background-image: 
+        radial-gradient(circle at 20% 50%, rgba(0, 217, 255, 0.05) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(0, 255, 157, 0.05) 0%, transparent 50%);
+    }
+    
+    .container {
+      max-width: 100%;
+      padding: 16px;
+    }
+    
+    header {
+      padding: 24px 0 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    
+    h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+      background: linear-gradient(135deg, var(--accent), var(--success));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    /* Entry Form */
+    .entry-form {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+    }
+    
+    .form-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .form-group {
+      margin-bottom: 16px;
+    }
+    
+    label {
+      display: block;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    
+    input, select {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px;
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+    
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+    
+    input::placeholder {
+      color: var(--text-dim);
+      opacity: 0.5;
+    }
+    
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      margin-top: 8px;
+    }
+    
+    .checkbox-group input[type="checkbox"] {
+      width: auto;
+      margin-right: 8px;
+    }
+    
+    .checkbox-group label {
+      margin-bottom: 0;
+      text-transform: none;
+      font-size: 13px;
+      color: var(--text);
+    }
+    
+    button {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--success));
+      border: none;
+      border-radius: 8px;
+      padding: 14px;
+      color: var(--bg);
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-top: 8px;
+    }
+    
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px var(--accent-glow);
+    }
+    
+    button:active {
+      transform: translateY(0);
+    }
+    
+    /* Weekly Summary */
+    .weekly-summary {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    
+    .week-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .week-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    
+    .week-range {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    
+    .summary-item {
+      background: var(--bg);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    
+    .summary-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    
+    .summary-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    
+    .summary-value.money {
+      color: var(--success);
+    }
+    
+    .summary-value.hours {
+      color: var(--accent);
+    }
+    
+    /* Entries List */
+    .entries-section {
+      margin-bottom: 24px;
+    }
+    
+    .section-title {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    
+    .entry-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: all 0.2s;
+      position: relative;
+    }
+    
+    .entry-card:hover {
+      border-color: var(--accent);
+      background: var(--surface-hover);
+    }
+    
+    .entry-card.grouped {
+      border-left: 3px solid var(--warning);
+    }
+    
+    .entry-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .entry-date {
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+    
+    .entry-show {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    
+    .entry-time {
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+    
+    .entry-details {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .detail-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+    }
+    
+    .detail-value {
+      font-family: 'Space Mono', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    
+    .detail-value.money {
+      color: var(--success);
+    }
+    
+    .detail-value.rate {
+      color: var(--accent);
+    }
+    
+    .entry-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    
+    .btn-delete {
+      flex: 1;
+      background: var(--error);
+      padding: 8px;
+      font-size: 11px;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-dim);
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.3;
+    }
+    
+    @media (max-width: 480px) {
+      .summary-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .entry-details {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Loading animation */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    
+    .loading {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1>Payroll Tracker</h1>
+          <div class="subtitle">Track hours & earnings</div>
+        </div>
+        <div style="position: relative;">
+          <button onclick="toggleBackupMenu()" style="padding: 8px 12px; font-size: 11px; background: var(--border); width: auto; margin: 0;">
+            ⚙️ Data
+          </button>
+          <div id="backupMenu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-width: 220px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+            <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+              iCloud Sync
+            </div>
+            <button onclick="quickSaveToCloud(); toggleBackupMenu();" style="width: 100%; padding: 8px; font-size: 11px; background: var(--success); margin-bottom: 4px;">
+              💾 Save to iCloud
+            </button>
+            <label style="position: relative; display: block; margin-bottom: 12px;">
+              <button style="width: 100%; padding: 8px; font-size: 11px; background: var(--accent);">
+                📥 Load from iCloud
+              </button>
+              <input type="file" accept=".csv" onchange="quickLoadFromCloud(event); toggleBackupMenu();" style="position: absolute; opacity: 0; width: 100%; height: 100%; top: 0; left: 0; cursor: pointer;">
+            </label>
+            
+            <div style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px;">
+              <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+                Backup & Restore
+              </div>
+              <button onclick="exportToCSV(); toggleBackupMenu();" style="width: 100%; padding: 8px; font-size: 11px; background: var(--border); margin-bottom: 4px;">
+                Download Backup
+              </button>
+              <button onclick="restoreBackup(); toggleBackupMenu();" style="width: 100%; padding: 8px; font-size: 11px; background: var(--error);">
+                Undo Last Import
+              </button>
+            </div>
+            
+            <div style="font-size: 8px; color: var(--text-dim); margin-top: 8px; padding: 6px; background: var(--bg); border-radius: 4px; line-height: 1.3;">
+              💡 <strong>Setup:</strong> Save to iCloud once, then use "Load from iCloud" to sync. Save your CSV to iCloud Drive for easy access.
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+    
+    <!-- Entry Form -->
+    <div class="entry-form">
+      <div class="form-title">New Entry</div>
+      
+      <div class="form-group">
+        <label>Date</label>
+        <input type="date" id="date" required>
+      </div>
+      
+      <div class="form-group">
+        <label>Show Name</label>
+        <input type="text" id="show" placeholder="e.g. Dreamland">
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>Start Time</label>
+          <input type="time" id="startTime" required>
+        </div>
+        <div class="form-group">
+          <label>End Time</label>
+          <input type="time" id="endTime" required>
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Notes</label>
+        <input type="text" id="notes" placeholder="Optional notes">
+      </div>
+      
+      <div class="form-row">
+        <div class="form-group">
+          <label>Gross Pay ($)</label>
+          <input type="number" id="grossPay" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label>Net Pay ($)</label>
+          <input type="number" id="netPay" step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      
+      <div class="form-group">
+        <label>Minimum Pay Type (Optional)</label>
+        <select id="minPayType">
+          <option value="">None</option>
+          <option value="8hr">8 Hour Minimum (Standard)</option>
+          <option value="10hr">10 Hour Minimum (8hr + 2hr @ 1.5x)</option>
+          <option value="12hr">12 Hour Minimum (8hr + 4hr @ 1.5x)</option>
+        </select>
+      </div>
+      
+      <button onclick="addEntry()">Add Entry</button>
+      <button id="cancelBtn" onclick="clearForm()" style="display: none; background: var(--border); margin-top: 8px;">Cancel Edit</button>
+    </div>
+    
+    <!-- iCloud Sync Guide -->
+    <div id="icloudGuide" style="background: linear-gradient(135deg, var(--surface), var(--bg)); border: 1px solid var(--accent); border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div style="font-size: 14px; font-weight: 700; color: var(--accent);">
+          ☁️ iCloud Sync Setup
+        </div>
+        <button onclick="document.getElementById('icloudGuide').style.display='none'" style="background: transparent; border: none; color: var(--text-dim); padding: 0; font-size: 18px; cursor: pointer; width: auto; margin: 0;">×</button>
+      </div>
+      <div style="font-size: 12px; line-height: 1.6; color: var(--text);">
+        <strong>First time:</strong>
+        <ol style="margin: 8px 0; padding-left: 20px;">
+          <li>Add some entries</li>
+          <li>Tap "⚙️ Data" → "💾 Save to iCloud"</li>
+          <li>Save to Files → iCloud Drive → choose a folder</li>
+        </ol>
+        <strong>To sync:</strong>
+        <ol style="margin: 8px 0; padding-left: 20px;">
+          <li>Tap "⚙️ Data" → "📥 Load from iCloud"</li>
+          <li>Select your payroll-data.csv file</li>
+          <li>Done! Your data is synced</li>
+        </ol>
+        <div style="font-size: 10px; color: var(--text-dim); margin-top: 8px; padding: 8px; background: var(--bg); border-radius: 4px;">
+          💡 Pro tip: Before making big changes, tap "Save to iCloud" to back up your current data!
+        </div>
+      </div>
+    </div>
+    
+    <!-- Weekly Summary -->
+    <div id="weeklySummary"></div>
+    
+    <!-- Global Stats -->
+    <div id="globalStats"></div>
+    
+    <!-- Entries List -->
+    <div class="entries-section">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="section-title">All Entries</div>
+        <div style="display: flex; gap: 8px;">
+          <button onclick="expandAllWeeks()" style="padding: 6px 12px; font-size: 11px; background: var(--border); width: auto; margin: 0;">
+            Expand All
+          </button>
+          <button onclick="collapseAllWeeks()" style="padding: 6px 12px; font-size: 11px; background: var(--border); width: auto; margin: 0;">
+            Collapse All
+          </button>
+        </div>
+      </div>
+      <div id="entriesList"></div>
+    </div>
+  </div>
+  
+  <script>
+    // Initialize
+    let entries = [];
+    let editingId = null;
+    
+    // Load data on startup
+    function loadData() {
+      try {
+        const saved = localStorage.getItem('payroll-entries');
+        if (saved) {
+          entries = JSON.parse(saved);
+          renderAll();
+        }
+      } catch (error) {
+        console.log('No existing data found, starting fresh');
+        renderAll();
+      }
+    }
+    
+    // Save data
+    function saveData() {
+      try {
+        localStorage.setItem('payroll-entries', JSON.stringify(entries));
+        // Auto-export to CSV backup
+        exportToCSV(true);
+      } catch (error) {
+        console.error('Error saving data:', error);
+        alert('Error saving data. Please try again.');
+      }
+    }
+    
+    // Export to CSV
+    function exportToCSV(autoBackup = false) {
+      if (entries.length === 0) {
+        if (!autoBackup) alert('No entries to export');
+        return;
+      }
+      
+      // CSV header
+      let csv = 'Date,Show,Start Time,End Time,Notes,Gross Pay,Net Pay,Hours,Min Pay Type\n';
+      
+      // Add each entry
+      entries.forEach(entry => {
+        csv += `${entry.date},"${(entry.show || '').replace(/"/g, '""')}",${entry.startTime},${entry.endTime},"${(entry.notes || '').replace(/"/g, '""')}",${entry.grossPay || ''},${entry.netPay || ''},${entry.hours},${entry.minPayType || ''}\n`;
+      });
+      
+      if (!autoBackup) {
+        // Manual download
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `payroll-backup-${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Auto-backup to localStorage
+        localStorage.setItem('payroll-csv-backup', csv);
+        localStorage.setItem('payroll-last-backup', new Date().toISOString());
+      }
+    }
+    
+    // Quick Save to iCloud (downloads with standard name)
+    function quickSaveToCloud() {
+      if (entries.length === 0) {
+        alert('No entries to save');
+        return;
+      }
+      
+      // CSV header
+      let csv = 'Date,Show,Start Time,End Time,Notes,Gross Pay,Net Pay,Hours,Min Pay Type\n';
+      
+      // Add each entry
+      entries.forEach(entry => {
+        csv += `${entry.date},"${(entry.show || '').replace(/"/g, '""')}",${entry.startTime},${entry.endTime},"${(entry.notes || '').replace(/"/g, '""')}",${entry.grossPay || ''},${entry.netPay || ''},${entry.hours},${entry.minPayType || ''}\n`;
+      });
+      
+      // Download with consistent filename for easy iCloud sync
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'payroll-data.csv';  // Consistent filename
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      alert('💾 Saved! \n\nOn iOS:\n1. Tap the downloaded file\n2. Choose "Save to Files"\n3. Select "iCloud Drive"\n4. Save to a folder you\'ll remember\n\nNext time, tap "Load from iCloud" to sync!');
+    }
+    
+    // Quick Load from iCloud
+    function quickLoadFromCloud(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const csv = e.target.result;
+          const lines = csv.split('\n');
+          const newEntries = [];
+          
+          // Skip header row
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            // Split CSV properly, handling quoted fields
+            const fields = [];
+            let currentField = '';
+            let insideQuotes = false;
+            
+            for (let j = 0; j < line.length; j++) {
+              const char = line[j];
+              
+              if (char === '"') {
+                if (insideQuotes && line[j + 1] === '"') {
+                  currentField += '"';
+                  j++;
+                } else {
+                  insideQuotes = !insideQuotes;
+                }
+              } else if (char === ',' && !insideQuotes) {
+                fields.push(currentField);
+                currentField = '';
+              } else {
+                currentField += char;
+              }
+            }
+            fields.push(currentField);
+            
+            if (fields.length < 8) continue;
+            
+            const [date, show, startTime, endTime, notes, grossPay, netPay, hours, minPayType] = fields;
+            
+            newEntries.push({
+              id: Date.now() + i,
+              date: date.trim(),
+              show: show.trim(),
+              startTime: startTime.trim(),
+              endTime: endTime.trim(),
+              notes: notes.trim(),
+              grossPay: grossPay.trim() ? parseFloat(grossPay) : null,
+              netPay: netPay.trim() ? parseFloat(netPay) : null,
+              hours: parseFloat(hours),
+              minPayType: minPayType ? minPayType.trim() : ''
+            });
+          }
+          
+          if (newEntries.length > 0) {
+            entries = newEntries;
+            saveData();
+            renderAll();
+            alert(`✅ Loaded ${newEntries.length} entries from iCloud!`);
+          } else {
+            alert('No entries found in file.');
+          }
+        } catch (error) {
+          console.error('Error loading from iCloud:', error);
+          alert('Error loading file: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+      
+      event.target.value = '';
+    }
+    function restoreBackup() {
+      try {
+        const backup = localStorage.getItem('payroll-backup-before-import');
+        if (!backup) {
+          alert('No backup found. Backups are only created before importing CSV files.');
+          return;
+        }
+        
+        const backupData = JSON.parse(backup);
+        const backupDate = new Date(backupData.timestamp).toLocaleString();
+        
+        if (confirm(`Restore backup from ${backupDate}?\n\nThis will replace your current data with ${backupData.entries.length} entries.`)) {
+          entries = backupData.entries;
+          saveData();
+          renderAll();
+          alert('Backup restored successfully!');
+        }
+      } catch (error) {
+        console.error('Error restoring backup:', error);
+        alert('Error restoring backup: ' + error.message);
+      }
+    }
+    
+    // Import from CSV
+    function importFromCSV(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const csv = e.target.result;
+          const lines = csv.split('\n');
+          const newEntries = [];
+          
+          console.log('Total lines:', lines.length);
+          
+          // Skip header row
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+            
+            console.log('Processing line', i, ':', line);
+            
+            // Split CSV properly, handling quoted fields
+            const fields = [];
+            let currentField = '';
+            let insideQuotes = false;
+            
+            for (let j = 0; j < line.length; j++) {
+              const char = line[j];
+              
+              if (char === '"') {
+                if (insideQuotes && line[j + 1] === '"') {
+                  // Escaped quote
+                  currentField += '"';
+                  j++; // Skip next quote
+                } else {
+                  // Toggle quote state
+                  insideQuotes = !insideQuotes;
+                }
+              } else if (char === ',' && !insideQuotes) {
+                // End of field
+                fields.push(currentField);
+                currentField = '';
+              } else {
+                currentField += char;
+              }
+            }
+            // Add last field
+            fields.push(currentField);
+            
+            console.log('Parsed fields:', fields);
+            
+            if (fields.length < 8) {
+              console.log('Skipping line - not enough fields:', fields.length);
+              continue;
+            }
+            
+            const [date, show, startTime, endTime, notes, grossPay, netPay, hours, minPayType] = fields;
+            
+            const entry = {
+              id: Date.now() + i,
+              date: date.trim(),
+              show: show.trim(),
+              startTime: startTime.trim(),
+              endTime: endTime.trim(),
+              notes: notes.trim(),
+              grossPay: grossPay.trim() ? parseFloat(grossPay) : null,
+              netPay: netPay.trim() ? parseFloat(netPay) : null,
+              hours: parseFloat(hours),
+              minPayType: minPayType ? minPayType.trim() : ''
+            };
+            
+            console.log('Created entry:', entry);
+            newEntries.push(entry);
+          }
+          
+          console.log('Total entries parsed:', newEntries.length);
+          
+          if (newEntries.length > 0) {
+            // Store backup before importing
+            const backup = {
+              timestamp: new Date().toISOString(),
+              entries: [...entries]
+            };
+            localStorage.setItem('payroll-backup-before-import', JSON.stringify(backup));
+            
+            if (confirm(`Import ${newEntries.length} entries? This will replace all current data.\n\nA backup of your current data will be saved.`)) {
+              entries = newEntries;
+              saveData();
+              renderAll();
+              alert('Data imported successfully! Previous data backed up.');
+            }
+          } else {
+            alert('No valid entries found in CSV file. Please check the file format.');
+          }
+        } catch (error) {
+          console.error('Error importing CSV:', error);
+          alert('Error importing CSV file: ' + error.message);
+        }
+      };
+      reader.readAsText(file);
+      
+      // Reset input
+      event.target.value = '';
+    }
+    
+    // Get unique show names for autocomplete
+    function getShowNames() {
+      const shows = [...new Set(entries.map(e => e.show).filter(s => s))];
+      return shows.sort();
+    }
+    
+    // Setup autocomplete for show name
+    function setupShowAutocomplete() {
+      const input = document.getElementById('show');
+      const shows = getShowNames();
+      
+      // Remove existing datalist if any
+      const existingDatalist = document.getElementById('showList');
+      if (existingDatalist) {
+        existingDatalist.remove();
+      }
+      
+      // Create new datalist
+      const datalist = document.createElement('datalist');
+      datalist.id = 'showList';
+      shows.forEach(show => {
+        const option = document.createElement('option');
+        option.value = show;
+        datalist.appendChild(option);
+      });
+      
+      input.setAttribute('list', 'showList');
+      document.body.appendChild(datalist);
+    }
+    
+    // Calculate hours from time strings
+    function calculateHours(startTime, endTime) {
+      const [startH, startM] = startTime.split(':').map(Number);
+      const [endH, endM] = endTime.split(':').map(Number);
+      
+      let hours = endH - startH;
+      let minutes = endM - startM;
+      
+      if (minutes < 0) {
+        hours -= 1;
+        minutes += 60;
+      }
+      
+      return hours + (minutes / 60);
+    }
+    
+    // Get week start (Sunday) for a date
+    function getWeekStart(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = day; // Sunday is 0, so diff is days since Sunday
+      const weekStart = new Date(d);
+      weekStart.setDate(d.getDate() - diff);
+      weekStart.setHours(0, 0, 0, 0);
+      return weekStart;
+    }
+    
+    // Format date
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    
+    // Format date with day of week
+    function formatDateWithDay(dateStr) {
+      const date = new Date(dateStr);
+      const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+      const month = date.toLocaleDateString('en-US', { month: 'short' });
+      const day = date.getDate();
+      const year = date.getFullYear();
+      const currentYear = new Date().getFullYear();
+      
+      // Only show year if it's different from current year
+      if (year !== currentYear) {
+        return `${dayOfWeek} ${month} ${day}, ${year}`;
+      }
+      return `${dayOfWeek} ${month} ${day}`;
+    }
+    
+    // Add or update entry
+    function addEntry() {
+      const date = document.getElementById('date').value;
+      const show = document.getElementById('show').value;
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+      const notes = document.getElementById('notes').value;
+      const grossPay = parseFloat(document.getElementById('grossPay').value) || null;
+      const netPay = parseFloat(document.getElementById('netPay').value) || null;
+      const minPayType = document.getElementById('minPayType').value;
+      
+      if (!date || !startTime || !endTime) {
+        alert('Please fill in required fields: Date, Start Time, End Time');
+        return;
+      }
+      
+      const hours = calculateHours(startTime, endTime);
+      
+      if (editingId) {
+        // Update existing entry
+        const index = entries.findIndex(e => e.id === editingId);
+        if (index !== -1) {
+          entries[index] = {
+            id: editingId,
+            date,
+            show,
+            startTime,
+            endTime,
+            notes,
+            grossPay,
+            netPay,
+            hours,
+            minPayType
+          };
+        }
+        editingId = null;
+        document.querySelector('.form-title').textContent = 'New Entry';
+        document.querySelector('button[onclick="addEntry()"]').textContent = 'Add Entry';
+      } else {
+        // Add new entry
+        const entry = {
+          id: Date.now(),
+          date,
+          show,
+          startTime,
+          endTime,
+          notes,
+          grossPay,
+          netPay,
+          hours,
+          minPayType
+        };
+        entries.push(entry);
+      }
+      
+      entries.sort((a, b) => new Date(a.date) - new Date(b.date));
+      
+      saveData();
+      renderAll();
+      clearForm();
+    }
+    
+    // Clear form
+    function clearForm() {
+      document.getElementById('show').value = '';
+      document.getElementById('startTime').value = '07:00';
+      document.getElementById('endTime').value = '13:00';
+      document.getElementById('notes').value = '';
+      document.getElementById('grossPay').value = '';
+      document.getElementById('netPay').value = '';
+      document.getElementById('minPayType').value = '';
+      editingId = null;
+      document.querySelector('.form-title').textContent = 'New Entry';
+      document.querySelector('button[onclick="addEntry()"]').textContent = 'Add Entry';
+      document.getElementById('cancelBtn').style.display = 'none';
+    }
+    
+    // Edit entry
+    function editEntry(id) {
+      const entry = entries.find(e => e.id === id);
+      if (!entry) return;
+      
+      document.getElementById('date').value = entry.date;
+      document.getElementById('show').value = entry.show || '';
+      document.getElementById('startTime').value = entry.startTime;
+      document.getElementById('endTime').value = entry.endTime;
+      document.getElementById('notes').value = entry.notes || '';
+      document.getElementById('grossPay').value = entry.grossPay || '';
+      document.getElementById('netPay').value = entry.netPay || '';
+      document.getElementById('minPayType').value = entry.minPayType || '';
+      
+      editingId = id;
+      document.querySelector('.form-title').textContent = 'Edit Entry';
+      document.querySelector('button[onclick="addEntry()"]').textContent = 'Update Entry';
+      document.getElementById('cancelBtn').style.display = 'block';
+      
+      // Scroll to top
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    
+    // Delete entry
+    function deleteEntry(id) {
+      if (confirm('Delete this entry?')) {
+        entries = entries.filter(e => e.id !== id);
+        saveData();
+        renderAll();
+      }
+    }
+    
+    // Calculate grouped entries (multi-day shows)
+    function getEntryGroups() {
+      const groups = [];
+      let currentGroup = [];
+      
+      for (let i = 0; i < entries.length; i++) {
+        const entry = entries[i];
+        const prevEntry = i > 0 ? entries[i - 1] : null;
+        
+        // Group if same show name AND in the same week
+        const shouldGroup = prevEntry && 
+          entry.show && 
+          prevEntry.show === entry.show &&
+          isSameWeek(prevEntry.date, entry.date);
+        
+        if (shouldGroup && currentGroup.length > 0) {
+          currentGroup.push(entry);
+        } else {
+          if (currentGroup.length > 0) {
+            groups.push(currentGroup);
+          }
+          currentGroup = [entry];
+        }
+      }
+      
+      if (currentGroup.length > 0) {
+        groups.push(currentGroup);
+      }
+      
+      return groups;
+    }
+    
+    // Check if two dates are in the same week (Sunday-Saturday)
+    function isSameWeek(date1, date2) {
+      const week1 = getWeekStart(date1);
+      const week2 = getWeekStart(date2);
+      return week1.getTime() === week2.getTime();
+    }
+    
+    // Calculate weekly summary
+    function getWeeklySummary() {
+      const weeks = {};
+      const groups = getEntryGroups();
+      
+      groups.forEach(group => {
+        // Find the entry with pay (if any)
+        const entryWithPay = group.find(e => e.grossPay !== null && e.netPay !== null);
+        const totalHours = group.reduce((sum, e) => sum + e.hours, 0);
+        
+        // Use the first entry's date to determine the week
+        const weekStart = getWeekStart(group[0].date);
+        const weekKey = weekStart.toISOString();
+        
+        if (!weeks[weekKey]) {
+          weeks[weekKey] = {
+            weekStart,
+            grossPay: 0,
+            netPay: 0,
+            hours: 0,
+            entries: 0
+          };
+        }
+        
+        if (entryWithPay) {
+          weeks[weekKey].grossPay += entryWithPay.grossPay;
+          weeks[weekKey].netPay += entryWithPay.netPay;
+        }
+        
+        weeks[weekKey].hours += totalHours;
+        weeks[weekKey].entries += group.length;
+      });
+      
+      return Object.values(weeks).sort((a, b) => b.weekStart - a.weekStart);
+    }
+    
+    // Get week number of the year
+    function getWeekNumber(date) {
+      const d = new Date(date);
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + 4 - (d.getDay() || 7));
+      const yearStart = new Date(d.getFullYear(), 0, 1);
+      const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+      return weekNo;
+    }
+    
+    // Render global stats
+    function renderGlobalStats() {
+      const container = document.getElementById('globalStats');
+      
+      if (entries.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      const groups = getEntryGroups();
+      
+      // Calculate totals
+      let totalHours = 0;
+      let totalGrossPay = 0;
+      let totalNetPay = 0;
+      let paidShows = 0;
+      let paidDays = 0;
+      let pendingShows = 0;
+      let pendingDays = 0;
+      let pendingHours = 0;
+      
+      const dates = entries.map(e => new Date(e.date));
+      const firstDate = new Date(Math.min(...dates));
+      const lastDate = new Date(Math.max(...dates));
+      
+      groups.forEach(group => {
+        const groupHours = group.reduce((sum, e) => sum + e.hours, 0);
+        totalHours += groupHours;
+        
+        const entryWithPay = group.find(e => e.grossPay !== null && e.netPay !== null);
+        if (entryWithPay) {
+          totalGrossPay += entryWithPay.grossPay;
+          totalNetPay += entryWithPay.netPay;
+          paidShows++;
+          paidDays += group.length;
+        } else {
+          pendingShows++;
+          pendingDays += group.length;
+          pendingHours += groupHours;
+        }
+      });
+      
+      const avgGrossHourly = totalGrossPay > 0 ? (totalGrossPay / totalHours).toFixed(2) : '0.00';
+      const avgNetHourly = totalNetPay > 0 ? (totalNetPay / totalHours).toFixed(2) : '0.00';
+      
+      container.innerHTML = `
+        <div class="weekly-summary" style="margin-bottom: 24px;">
+          <div class="week-header">
+            <div class="week-title">All Time Stats</div>
+            <div class="week-range">${formatDate(firstDate)} - ${formatDate(lastDate)}</div>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-item">
+              <div class="summary-label">Total Hours</div>
+              <div class="summary-value hours">${totalHours.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Days</div>
+              <div class="summary-value">${entries.length}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Gross Pay</div>
+              <div class="summary-value money">$${totalGrossPay.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Net Pay</div>
+              <div class="summary-value money">$${totalNetPay.toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Avg Gross/Hr</div>
+              <div class="summary-value rate">$${avgGrossHourly}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Avg Net/Hr</div>
+              <div class="summary-value rate">$${avgNetHourly}</div>
+            </div>
+            ${pendingShows > 0 ? `
+              <div class="summary-item">
+                <div class="summary-label">Pay Pending Shows</div>
+                <div class="summary-value" style="color: var(--warning);">${pendingShows}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Pay Pending Days</div>
+                <div class="summary-value" style="color: var(--warning);">${pendingDays}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Pay Pending Hours</div>
+                <div class="summary-value" style="color: var(--warning);">${pendingHours.toFixed(2)}</div>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+    
+    // Calculate payable hours based on minimum pay type
+    function getPayableHours(entry) {
+      if (!entry.minPayType) return entry.hours;
+      
+      let minHours = 0;
+      switch(entry.minPayType) {
+        case '8hr':
+          minHours = 8;
+          break;
+        case '10hr':
+          minHours = 10;
+          break;
+        case '12hr':
+          minHours = 12;
+          break;
+        default:
+          return entry.hours;
+      }
+      
+      return Math.max(entry.hours, minHours);
+    }
+    
+    // Calculate pay hours breakdown by rate (1x, 1.5x, 2x, 3x) based on union rules
+    function getPayHoursBreakdown(entry) {
+      if (!entry.minPayType) {
+        return {
+          standardRate: entry.hours,
+          timeAndHalf: 0,
+          doubleTime: 0,
+          tripleTime: 0,
+          totalPayable: entry.hours
+        };
+      }
+      
+      const actualHours = entry.hours;
+      let minHours = 0;
+      
+      switch(entry.minPayType) {
+        case '8hr':
+          minHours = 8;
+          break;
+        case '10hr':
+          minHours = 10;
+          break;
+        case '12hr':
+          minHours = 12;
+          break;
+      }
+      
+      const payableHours = Math.max(actualHours, minHours);
+      
+      let standardRate = 0;    // 1x
+      let timeAndHalf = 0;     // 1.5x (hours 9-12)
+      let doubleTime = 0;      // 2x (hours 13-15)
+      let tripleTime = 0;      // 3x (hours 16+)
+      
+      // If worked less than minimum, pay minimum at standard rate
+      if (actualHours <= minHours) {
+        if (minHours <= 8) {
+          standardRate = minHours;
+        } else if (minHours <= 12) {
+          // 10hr or 12hr minimum where we didn't work that long
+          standardRate = 8;
+          timeAndHalf = minHours - 8;
+        }
+      } else {
+        // Worked more than minimum - pay based on actual hours with overtime
+        if (actualHours <= 8) {
+          standardRate = actualHours;
+        } else if (actualHours <= 12) {
+          standardRate = 8;
+          timeAndHalf = actualHours - 8;
+        } else if (actualHours <= 15) {
+          standardRate = 8;
+          timeAndHalf = 4;  // hours 9-12
+          doubleTime = actualHours - 12;
+        } else {
+          standardRate = 8;
+          timeAndHalf = 4;  // hours 9-12
+          doubleTime = 3;   // hours 13-15
+          tripleTime = actualHours - 15;
+        }
+      }
+      
+      return {
+        standardRate,
+        timeAndHalf,
+        doubleTime,
+        tripleTime,
+        totalPayable: payableHours
+      };
+    }
+    
+    // Render weekly summary
+    function renderWeeklySummary() {
+      const summary = getWeeklySummary();
+      const container = document.getElementById('weeklySummary');
+      
+      if (summary.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+      
+      let html = '';
+      
+      // Check if current week has entries
+      const today = new Date();
+      const currentWeekStart = getWeekStart(today);
+      const currentWeek = summary.find(week => 
+        week.weekStart.getTime() === currentWeekStart.getTime()
+      );
+      
+      // Show current week if it exists
+      if (currentWeek) {
+        const weekEnd = new Date(currentWeek.weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        // Get all entries for this week
+        const groups = getEntryGroups();
+        const currentWeekGroups = groups.filter(group => {
+          const groupWeekStart = getWeekStart(group[0].date);
+          return groupWeekStart.getTime() === currentWeekStart.getTime();
+        });
+        
+        // Flatten to get all entries
+        const currentWeekEntries = currentWeekGroups.flat();
+        
+        // Check if ALL entries have min pay type
+        const allHaveMinPay = currentWeekEntries.every(entry => entry.minPayType);
+        
+        let payableHours = 0;
+        let standardRate = 0;
+        let timeAndHalf = 0;
+        let doubleTime = 0;
+        let tripleTime = 0;
+        
+        if (allHaveMinPay) {
+          currentWeekEntries.forEach(entry => {
+            const breakdown = getPayHoursBreakdown(entry);
+            payableHours += breakdown.totalPayable;
+            standardRate += breakdown.standardRate;
+            timeAndHalf += breakdown.timeAndHalf;
+            doubleTime += breakdown.doubleTime;
+            tripleTime += breakdown.tripleTime;
+          });
+        }
+        
+        const numShows = currentWeekGroups.length;
+        
+        html += `
+          <div class="weekly-summary">
+            <div class="week-header">
+              <div class="week-title">This Week</div>
+              <div class="week-range">${formatDate(currentWeek.weekStart)} - ${formatDate(weekEnd)}</div>
+            </div>
+            <div class="summary-grid">
+              <div class="summary-item">
+                <div class="summary-label">Hours Worked</div>
+                <div class="summary-value hours">${currentWeek.hours.toFixed(2)}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Standard Payable Hrs</div>
+                <div class="summary-value hours">${allHaveMinPay ? payableHours.toFixed(2) : 'N/A'}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Days Worked</div>
+                <div class="summary-value">${currentWeek.entries}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Number of Shows</div>
+                <div class="summary-value">${numShows}</div>
+              </div>
+              ${allHaveMinPay ? `
+                <div class="summary-item">
+                  <div class="summary-label">Standard (1x)</div>
+                  <div class="summary-value">${standardRate.toFixed(2)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">OT (1.5x)</div>
+                  <div class="summary-value">${timeAndHalf.toFixed(2)}</div>
+                </div>
+                ${(doubleTime > 0 || tripleTime > 0) ? `
+                  <div class="summary-item">
+                    <div class="summary-label">2x Time</div>
+                    <div class="summary-value">${doubleTime.toFixed(2)}</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-label">3x Time</div>
+                    <div class="summary-value">${tripleTime.toFixed(2)}</div>
+                  </div>
+                ` : ''}
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }
+      
+      // Find last week with pay entered (most recent week with grossPay/netPay that's not current week)
+      const lastPaidWeek = summary.find(week => 
+        week.weekStart.getTime() !== currentWeekStart.getTime() && week.grossPay > 0
+      );
+      
+      if (lastPaidWeek) {
+        const weekEnd = new Date(lastPaidWeek.weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        const grossHourly = lastPaidWeek.grossPay > 0 ? (lastPaidWeek.grossPay / lastPaidWeek.hours).toFixed(2) : '0.00';
+        const netHourly = lastPaidWeek.netPay > 0 ? (lastPaidWeek.netPay / lastPaidWeek.hours).toFixed(2) : '0.00';
+        
+        // Get all entries for last paid week
+        const groups = getEntryGroups();
+        const lastPaidWeekGroups = groups.filter(group => {
+          const groupWeekStart = getWeekStart(group[0].date);
+          return groupWeekStart.getTime() === lastPaidWeek.weekStart.getTime();
+        });
+        
+        // Flatten to get all entries
+        const lastPaidWeekEntries = lastPaidWeekGroups.flat();
+        
+        // Check if ALL entries have min pay type
+        const allHaveMinPay = lastPaidWeekEntries.every(entry => entry.minPayType);
+        
+        let payableHours = 0;
+        let standardRate = 0;
+        let timeAndHalf = 0;
+        let doubleTime = 0;
+        let tripleTime = 0;
+        
+        if (allHaveMinPay) {
+          lastPaidWeekEntries.forEach(entry => {
+            const breakdown = getPayHoursBreakdown(entry);
+            payableHours += breakdown.totalPayable;
+            standardRate += breakdown.standardRate;
+            timeAndHalf += breakdown.timeAndHalf;
+            doubleTime += breakdown.doubleTime;
+            tripleTime += breakdown.tripleTime;
+          });
+        }
+        
+        const numShows = lastPaidWeekGroups.length;
+        
+        html += `
+          <div class="weekly-summary" style="margin-top: 16px;">
+            <div style="cursor: pointer;" onclick="toggleLastWeek()">
+              <div class="week-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div>
+                    <div class="week-title">Last Week Paid</div>
+                    <div class="week-range">${formatDate(lastPaidWeek.weekStart)} - ${formatDate(weekEnd)}</div>
+                  </div>
+                  <div id="arrow-lastweek" style="font-size: 20px; color: var(--accent);">▼</div>
+                </div>
+              </div>
+            </div>
+            <div id="lastWeekDetails" style="display: none;">
+              <div class="summary-grid" style="margin-top: 12px;">
+                <div class="summary-item">
+                  <div class="summary-label">Hours Worked</div>
+                  <div class="summary-value hours">${lastPaidWeek.hours.toFixed(2)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Standard Payable Hrs</div>
+                  <div class="summary-value hours">${allHaveMinPay ? payableHours.toFixed(2) : 'N/A'}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Days Worked</div>
+                  <div class="summary-value">${lastPaidWeek.entries}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Number of Shows</div>
+                  <div class="summary-value">${numShows}</div>
+                </div>
+                ${allHaveMinPay ? `
+                  <div class="summary-item">
+                    <div class="summary-label">Standard (1x)</div>
+                    <div class="summary-value">${standardRate.toFixed(2)}</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-label">OT (1.5x)</div>
+                    <div class="summary-value">${timeAndHalf.toFixed(2)}</div>
+                  </div>
+                  ${(doubleTime > 0 || tripleTime > 0) ? `
+                    <div class="summary-item">
+                      <div class="summary-label">2x Time</div>
+                      <div class="summary-value">${doubleTime.toFixed(2)}</div>
+                    </div>
+                    <div class="summary-item">
+                      <div class="summary-label">3x Time</div>
+                      <div class="summary-value">${tripleTime.toFixed(2)}</div>
+                    </div>
+                  ` : ''}
+                ` : ''}
+                <div class="summary-item">
+                  <div class="summary-label">Gross Pay</div>
+                  <div class="summary-value money">$${lastPaidWeek.grossPay.toFixed(2)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Net Pay</div>
+                  <div class="summary-value money">$${lastPaidWeek.netPay.toFixed(2)}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Gross Hourly</div>
+                  <div class="summary-value rate">$${grossHourly}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Net Hourly</div>
+                  <div class="summary-value rate">$${netHourly}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      
+      container.innerHTML = html;
+    }
+    
+    // Toggle backup menu
+    function toggleBackupMenu() {
+      const menu = document.getElementById('backupMenu');
+      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+    
+    // Expand all weeks
+    function expandAllWeeks() {
+      document.querySelectorAll('[id^="week-content-"]').forEach(el => {
+        el.style.display = 'block';
+      });
+      document.querySelectorAll('[id^="week-arrow-"]').forEach(el => {
+        el.textContent = '▲';
+      });
+    }
+    
+    // Collapse all weeks
+    function collapseAllWeeks() {
+      document.querySelectorAll('[id^="week-content-"]').forEach(el => {
+        el.style.display = 'none';
+      });
+      document.querySelectorAll('[id^="week-arrow-"]').forEach(el => {
+        el.textContent = '▼';
+      });
+    }
+    
+    // Toggle week visibility
+    function toggleWeek(weekId) {
+      const element = document.getElementById('week-content-' + weekId);
+      const arrow = document.getElementById('week-arrow-' + weekId);
+      
+      if (element.style.display === 'none') {
+        element.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        element.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    
+    // Close backup menu when clicking outside
+    document.addEventListener('click', function(event) {
+      const menu = document.getElementById('backupMenu');
+      const button = event.target.closest('button');
+      
+      if (menu && menu.style.display === 'block' && !menu.contains(event.target) && (!button || button.textContent.indexOf('Data') === -1)) {
+        menu.style.display = 'none';
+      }
+    });
+    
+    // Toggle last week visibility
+    function toggleLastWeek() {
+      const element = document.getElementById('lastWeekDetails');
+      const arrow = document.getElementById('arrow-lastweek');
+      
+      if (element.style.display === 'none') {
+        element.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        element.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    
+    // Render entries list grouped by week
+    function renderEntries() {
+      const container = document.getElementById('entriesList');
+      const groups = getEntryGroups();
+      
+      if (groups.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📊</div>
+            <div>No entries yet. Add your first shift above!</div>
+          </div>
+        `;
+        return;
+      }
+      
+      // Group entries by week
+      const weekGroups = {};
+      
+      groups.forEach(group => {
+        const weekStart = getWeekStart(group[0].date);
+        const weekKey = weekStart.toISOString();
+        
+        if (!weekGroups[weekKey]) {
+          weekGroups[weekKey] = {
+            weekStart,
+            groups: []
+          };
+        }
+        
+        weekGroups[weekKey].groups.push(group);
+      });
+      
+      // Sort weeks in reverse chronological order
+      const sortedWeeks = Object.values(weekGroups).sort((a, b) => b.weekStart - a.weekStart);
+      
+      let html = '';
+      
+      sortedWeeks.forEach(week => {
+        const weekEnd = new Date(week.weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        const weekNumber = getWeekNumber(week.weekStart);
+        
+        // Calculate total hours and pay for the week
+        let weekHours = 0;
+        let weekGrossPay = 0;
+        let weekNetPay = 0;
+        let totalDays = 0;
+        
+        week.groups.forEach(group => {
+          weekHours += group.reduce((gsum, e) => gsum + e.hours, 0);
+          totalDays += group.length;
+          const entryWithPay = group.find(e => e.grossPay !== null && e.netPay !== null);
+          if (entryWithPay) {
+            weekGrossPay += entryWithPay.grossPay;
+            weekNetPay += entryWithPay.netPay;
+          }
+        });
+        
+        const numShows = week.groups.length;
+        const weekId = week.weekStart.getTime();
+        
+        // Create days/shows description
+        let daysShowsText = '';
+        if (totalDays === numShows) {
+          daysShowsText = `${totalDays} day${totalDays > 1 ? 's' : ''} / ${numShows} show${numShows > 1 ? 's' : ''}`;
+        } else {
+          daysShowsText = `${totalDays} days on ${numShows} show${numShows > 1 ? 's' : ''}`;
+        }
+        
+        html += `
+          <div style="margin-bottom: 24px;">
+            <div onclick="toggleWeek('${weekId}')" style="cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px;">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <span>Week ${weekNumber} of 52 • ${formatDate(week.weekStart)} - ${formatDate(weekEnd)}</span>
+                    <span id="week-arrow-${weekId}" style="font-size: 16px; color: var(--accent); margin-left: 12px;">▼</span>
+                  </div>
+                  <div style="font-size: 10px; color: var(--text); margin-top: 4px; font-weight: normal;">
+                    ${daysShowsText} • ${weekHours.toFixed(2)} hrs
+                  </div>
+                  ${weekGrossPay > 0 ? `
+                    <div style="display: flex; gap: 16px; font-size: 10px; margin-top: 4px; font-weight: normal;">
+                      <span style="color: var(--success);">Gross: $${weekGrossPay.toFixed(2)}</span>
+                      <span style="color: var(--success);">Net: $${weekNetPay.toFixed(2)}</span>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            </div>
+            
+            <div id="week-content-${weekId}" style="display: none;">
+        `;
+        
+        week.groups.forEach((group, groupIndex) => {
+          const entryWithPay = group.find(e => e.grossPay !== null && e.netPay !== null);
+          const totalHours = group.reduce((sum, e) => sum + e.hours, 0);
+          const isMultiDay = group.length > 1;
+          const showName = group[0].show || '(continued)';
+          const groupId = `group-${week.weekStart.getTime()}-${groupIndex}`;
+          
+          let grossHourly = '';
+          let netHourly = '';
+          
+          if (entryWithPay && totalHours > 0) {
+            grossHourly = (entryWithPay.grossPay / totalHours).toFixed(2);
+            netHourly = (entryWithPay.netPay / totalHours).toFixed(2);
+          }
+          
+          // Always make multi-day shows collapsible
+          if (isMultiDay) {
+            // Collapsed view for multi-day shows
+            html += `
+              <div class="entry-card grouped" style="cursor: pointer;">
+                <div onclick="toggleGroup('${groupId}')" style="display: flex; justify-content: space-between; align-items: flex-start;">
+                  <div style="flex: 1;">
+                    <div class="entry-date">${formatDateWithDay(group[0].date)} - ${formatDateWithDay(group[group.length - 1].date)}</div>
+                    <div class="entry-show">${showName} <span style="font-size: 11px; color: var(--text-dim);">(${group.length} days)</span></div>
+                    <div class="entry-time">${totalHours.toFixed(2)} hours total</div>
+                  </div>
+                  <div id="arrow-${groupId}" style="font-size: 20px; color: var(--accent); user-select: none;">▼</div>
+                </div>
+                
+                ${entryWithPay ? `
+                  <div class="entry-details" style="margin-top: 12px;">
+                    <div class="detail-item">
+                      <div class="detail-label">Gross Pay</div>
+                      <div class="detail-value money">$${entryWithPay.grossPay.toFixed(2)}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Net Pay</div>
+                      <div class="detail-value money">$${entryWithPay.netPay.toFixed(2)}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Gross/Hr</div>
+                      <div class="detail-value rate">$${grossHourly}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Net/Hr</div>
+                      <div class="detail-value rate">$${netHourly}</div>
+                    </div>
+                  </div>
+                ` : ''}
+              
+                <!-- Expanded details -->
+                <div id="${groupId}" style="display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+            `;
+            
+            // Individual days within the group
+            group.forEach((entry) => {
+              const showPay = entry.id === entryWithPay?.id;
+              
+              html += `
+                <div style="background: var(--bg); border-radius: 6px; padding: 12px; margin-bottom: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div>
+                      <div class="entry-date" style="font-size: 12px;">${formatDateWithDay(entry.date)}</div>
+                      <div class="entry-time">${entry.startTime} - ${entry.endTime} (${entry.hours.toFixed(2)} hrs)</div>
+                      ${entry.notes ? `<div class="entry-time">${entry.notes}</div>` : ''}
+                    </div>
+                  </div>
+                  
+                  ${showPay ? `
+                    <div style="font-size: 11px; color: var(--success); margin-top: 8px; padding: 6px; background: var(--surface); border-radius: 4px;">
+                      ✓ Pay entered: $${entry.grossPay.toFixed(2)} gross / $${entry.netPay.toFixed(2)} net
+                    </div>
+                  ` : ''}
+                  
+                  <div style="display: flex; gap: 8px; margin-top: 8px;">
+                    <button style="flex: 1; background: var(--accent); padding: 6px; font-size: 10px;" onclick="event.stopPropagation(); editEntry(${entry.id})">Edit</button>
+                    <button style="flex: 1; background: var(--error); padding: 6px; font-size: 10px;" onclick="event.stopPropagation(); deleteEntry(${entry.id})">Delete</button>
+                  </div>
+                </div>
+              `;
+            });
+            
+            html += `
+                </div>
+              </div>
+            `;
+            
+          } else {
+            // Single day entry
+            const entry = group[0];
+            const showPay = entry.id === entryWithPay?.id;
+            
+            html += `
+              <div class="entry-card">
+                <div class="entry-header">
+                  <div>
+                    <div class="entry-date">${formatDateWithDay(entry.date)}</div>
+                    <div class="entry-show">${showName}</div>
+                    <div class="entry-time">${entry.startTime} - ${entry.endTime}</div>
+                    ${entry.notes ? `<div class="entry-time">${entry.notes}</div>` : ''}
+                  </div>
+                </div>
+                
+                <div class="entry-details">
+                  <div class="detail-item">
+                    <div class="detail-label">Hours</div>
+                    <div class="detail-value">${entry.hours.toFixed(2)}</div>
+                  </div>
+                  ${showPay ? `
+                    <div class="detail-item">
+                      <div class="detail-label">Gross Pay</div>
+                      <div class="detail-value money">$${entry.grossPay.toFixed(2)}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Net Pay</div>
+                      <div class="detail-value money">$${entry.netPay.toFixed(2)}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Gross/Hr</div>
+                      <div class="detail-value rate">$${grossHourly}</div>
+                    </div>
+                    <div class="detail-item">
+                      <div class="detail-label">Net/Hr</div>
+                      <div class="detail-value rate">$${netHourly}</div>
+                    </div>
+                  ` : `
+                    <div class="detail-item">
+                      <div class="detail-label">Pay Status</div>
+                      <div class="detail-value" style="color: var(--text-dim)">Pending</div>
+                    </div>
+                  `}
+                </div>
+                
+                <div class="entry-actions">
+                  <button style="flex: 1; background: var(--accent); padding: 8px; font-size: 11px;" onclick="editEntry(${entry.id})">Edit</button>
+                  <button class="btn-delete" onclick="deleteEntry(${entry.id})">Delete</button>
+                </div>
+              </div>
+            `;
+          }
+        });
+        
+        html += `
+            </div>
+          </div>
+        `;
+      });
+      
+      container.innerHTML = html;
+    }
+    
+    // Toggle group visibility
+    function toggleGroup(groupId) {
+      event.stopPropagation();
+      const element = document.getElementById(groupId);
+      const arrow = document.getElementById('arrow-' + groupId);
+      
+      if (element.style.display === 'none') {
+        element.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        element.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    
+    // Render all
+    function renderAll() {
+      renderWeeklySummary();
+      renderGlobalStats();
+      renderEntries();
+      setupShowAutocomplete();
+    }
+    
+    // Set today's date and default start time
+    document.getElementById('date').valueAsDate = new Date();
+    document.getElementById('startTime').value = '07:00';
+    document.getElementById('endTime').value = '13:00';
+    
+    // Load data when page loads
+    loadData();
+  </script>
+</body>
+</html>
