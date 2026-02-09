@@ -130,6 +130,27 @@
       gap: 12px;
     }
     
+    input[type="date"],
+    input[type="time"],
+    input[type="number"],
+    input[type="text"],
+    textarea,
+    select {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+    
+    @media (max-width: 480px) {
+      .form-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      
+      .form-group {
+        min-width: 0;
+      }
+    }
+    
     .checkbox-group {
       display: flex;
       align-items: center;
@@ -394,7 +415,7 @@
           <button onclick="toggleBackupMenu()" style="padding: 8px 12px; font-size: 11px; background: var(--border); width: auto; margin: 0;">
             ⚙️ Data
           </button>
-          <div id="backupMenu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-width: 220px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+          <div id="backupMenu" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; min-width: 240px; max-width: 320px; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
             <div style="font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
               CSV Sync
             </div>
@@ -418,6 +439,10 @@
               <button onclick="restoreBackup(); toggleBackupMenu();" style="width: 100%; padding: 8px; font-size: 11px; background: var(--error);">
                 Undo Last Import
               </button>
+            </div>
+            
+            <div id="csvTrackingInfo" style="border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; font-size: 9px; color: var(--text-dim); line-height: 1.4;">
+              <!-- Tracking info will be inserted here -->
             </div>
             
             <div style="font-size: 8px; color: var(--text-dim); margin-top: 8px; padding: 6px; background: var(--bg); border-radius: 4px; line-height: 1.3;">
@@ -624,6 +649,13 @@
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      
+      // Track CSV save info
+      const saveInfo = {
+        timestamp: new Date().toISOString(),
+        entryCount: entries.length
+      };
+      localStorage.setItem('payroll-last-save', JSON.stringify(saveInfo));
     }
     
     // Quick Load from iCloud
@@ -709,10 +741,18 @@
           console.log('Total entries parsed:', newEntries.length);
           
           if (newEntries.length > 0) {
+            // Track CSV load info
+            const loadInfo = {
+              timestamp: new Date().toISOString(),
+              entryCount: newEntries.length,
+              entries: JSON.stringify(newEntries) // Store snapshot for comparison
+            };
+            localStorage.setItem('payroll-last-load', JSON.stringify(loadInfo));
+            
             entries = newEntries;
             saveData();
             renderAll();
-            alert(`✅ Loaded ${newEntries.length} entries from iCloud!`);
+            alert(`✅ Loaded ${newEntries.length} entries from CSV!`);
           } else {
             alert('No entries found in file.');
           }
@@ -1227,6 +1267,7 @@
       let pendingShows = 0;
       let pendingDays = 0;
       let pendingHours = 0;
+      let totalStandardRateHours = 0;
       
       const dates = entries.map(e => new Date(e.date));
       const firstDate = new Date(Math.min(...dates));
@@ -1235,6 +1276,14 @@
       groups.forEach(group => {
         const groupHours = group.reduce((sum, e) => sum + e.hours, 0);
         totalHours += groupHours;
+        
+        // Calculate standard rate hours for this group
+        group.forEach(entry => {
+          if (entry.minPayType) {
+            const breakdown = getPayHoursBreakdown(entry);
+            totalStandardRateHours += breakdown.standardRate;
+          }
+        });
         
         const entryWithPay = group.find(e => e.grossPay !== null && e.netPay !== null);
         if (entryWithPay) {
@@ -1254,49 +1303,64 @@
       
       container.innerHTML = `
         <div class="weekly-summary" style="margin-bottom: 24px;">
-          <div class="week-header">
-            <div class="week-title">All Time Stats</div>
-            <div class="week-range">${formatDate(firstDate)} - ${formatDate(lastDate)}</div>
+          <div style="cursor: pointer;" onclick="toggleAllTimeStats()">
+            <div class="week-header">
+              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                <div>
+                  <div class="week-title">All Time Stats</div>
+                  <div class="week-range">${formatDate(firstDate)} - ${formatDate(lastDate)}</div>
+                </div>
+                <div id="arrow-alltimestats" style="font-size: 20px; color: var(--accent);">▼</div>
+              </div>
+            </div>
           </div>
-          <div class="summary-grid">
-            <div class="summary-item">
-              <div class="summary-label">Total Hours</div>
-              <div class="summary-value hours">${totalHours.toFixed(2)}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Total Days</div>
-              <div class="summary-value">${entries.length}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Total Gross Pay</div>
-              <div class="summary-value money">$${totalGrossPay.toFixed(2)}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Total Net Pay</div>
-              <div class="summary-value money">$${totalNetPay.toFixed(2)}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Avg Gross/Hr</div>
-              <div class="summary-value rate">$${avgGrossHourly}</div>
-            </div>
-            <div class="summary-item">
-              <div class="summary-label">Avg Net/Hr</div>
-              <div class="summary-value rate">$${avgNetHourly}</div>
-            </div>
-            ${pendingShows > 0 ? `
+          <div id="allTimeStatsDetails" style="display: none;">
+            <div class="summary-grid" style="margin-top: 12px;">
               <div class="summary-item">
-                <div class="summary-label">Pay Pending Shows</div>
-                <div class="summary-value" style="color: var(--warning);">${pendingShows}</div>
+                <div class="summary-label">Total Hours</div>
+                <div class="summary-value hours">${totalHours.toFixed(2)}</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Pay Pending Days</div>
-                <div class="summary-value" style="color: var(--warning);">${pendingDays}</div>
+                <div class="summary-label">Total Days</div>
+                <div class="summary-value">${entries.length}</div>
+              </div>
+              ${totalStandardRateHours > 0 ? `
+                <div class="summary-item">
+                  <div class="summary-label">Total Standard (1x)</div>
+                  <div class="summary-value">${totalStandardRateHours.toFixed(2)}</div>
+                </div>
+              ` : ''}
+              <div class="summary-item">
+                <div class="summary-label">Total Gross Pay</div>
+                <div class="summary-value money">$${totalGrossPay.toFixed(2)}</div>
               </div>
               <div class="summary-item">
-                <div class="summary-label">Pay Pending Hours</div>
-                <div class="summary-value" style="color: var(--warning);">${pendingHours.toFixed(2)}</div>
+                <div class="summary-label">Total Net Pay</div>
+                <div class="summary-value money">$${totalNetPay.toFixed(2)}</div>
               </div>
-            ` : ''}
+              <div class="summary-item">
+                <div class="summary-label">Avg Gross/Hr</div>
+                <div class="summary-value rate">$${avgGrossHourly}</div>
+              </div>
+              <div class="summary-item">
+                <div class="summary-label">Avg Net/Hr</div>
+                <div class="summary-value rate">$${avgNetHourly}</div>
+              </div>
+              ${pendingShows > 0 ? `
+                <div class="summary-item">
+                  <div class="summary-label">Pay Pending Shows</div>
+                  <div class="summary-value" style="color: var(--warning);">${pendingShows}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Pay Pending Days</div>
+                  <div class="summary-value" style="color: var(--warning);">${pendingDays}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Pay Pending Hours</div>
+                  <div class="summary-value" style="color: var(--warning);">${pendingHours.toFixed(2)}</div>
+                </div>
+              ` : ''}
+            </div>
           </div>
         </div>
       `;
@@ -1451,49 +1515,71 @@
         
         const numShows = currentWeekGroups.length;
         
+        const avgGrossHourly = currentWeek.grossPay > 0 ? (currentWeek.grossPay / currentWeek.hours).toFixed(2) : '0.00';
+        const avgNetHourly = currentWeek.netPay > 0 ? (currentWeek.netPay / currentWeek.hours).toFixed(2) : '0.00';
+        
         html += `
           <div class="weekly-summary">
-            <div class="week-header">
-              <div class="week-title">This Week</div>
-              <div class="week-range">${formatDate(currentWeek.weekStart)} - ${formatDate(weekEnd)}</div>
+            <div style="cursor: pointer;" onclick="toggleThisWeek()">
+              <div class="week-header">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <div>
+                    <div class="week-title">This Week</div>
+                    <div class="week-range">${formatDate(currentWeek.weekStart)} - ${formatDate(weekEnd)}</div>
+                  </div>
+                  <div id="arrow-thisweek" style="font-size: 20px; color: var(--accent);">▼</div>
+                </div>
+              </div>
             </div>
-            <div class="summary-grid">
-              <div class="summary-item">
-                <div class="summary-label">Hours Worked</div>
-                <div class="summary-value hours">${currentWeek.hours.toFixed(2)}</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Standard Payable Hrs</div>
-                <div class="summary-value hours">${allHaveMinPay ? payableHours.toFixed(2) : 'N/A'}</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Days Worked</div>
-                <div class="summary-value">${currentWeek.entries}</div>
-              </div>
-              <div class="summary-item">
-                <div class="summary-label">Number of Shows</div>
-                <div class="summary-value">${numShows}</div>
-              </div>
-              ${allHaveMinPay ? `
+            <div id="thisWeekDetails" style="display: none;">
+              <div class="summary-grid" style="margin-top: 12px;">
                 <div class="summary-item">
-                  <div class="summary-label">Standard (1x)</div>
-                  <div class="summary-value">${standardRate.toFixed(2)}</div>
+                  <div class="summary-label">Hours Worked</div>
+                  <div class="summary-value hours">${currentWeek.hours.toFixed(2)}</div>
                 </div>
                 <div class="summary-item">
-                  <div class="summary-label">OT (1.5x)</div>
-                  <div class="summary-value">${timeAndHalf.toFixed(2)}</div>
+                  <div class="summary-label">Standard Payable Hrs</div>
+                  <div class="summary-value hours">${allHaveMinPay ? payableHours.toFixed(2) : 'N/A'}</div>
                 </div>
-                ${(doubleTime > 0 || tripleTime > 0) ? `
+                <div class="summary-item">
+                  <div class="summary-label">Days Worked</div>
+                  <div class="summary-value">${currentWeek.entries}</div>
+                </div>
+                <div class="summary-item">
+                  <div class="summary-label">Number of Shows</div>
+                  <div class="summary-value">${numShows}</div>
+                </div>
+                ${allHaveMinPay ? `
                   <div class="summary-item">
-                    <div class="summary-label">2x Time</div>
-                    <div class="summary-value">${doubleTime.toFixed(2)}</div>
+                    <div class="summary-label">Standard (1x)</div>
+                    <div class="summary-value">${standardRate.toFixed(2)}</div>
                   </div>
                   <div class="summary-item">
-                    <div class="summary-label">3x Time</div>
-                    <div class="summary-value">${tripleTime.toFixed(2)}</div>
+                    <div class="summary-label">OT (1.5x)</div>
+                    <div class="summary-value">${timeAndHalf.toFixed(2)}</div>
+                  </div>
+                  ${(doubleTime > 0 || tripleTime > 0) ? `
+                    <div class="summary-item">
+                      <div class="summary-label">2x Time</div>
+                      <div class="summary-value">${doubleTime.toFixed(2)}</div>
+                    </div>
+                    <div class="summary-item">
+                      <div class="summary-label">3x Time</div>
+                      <div class="summary-value">${tripleTime.toFixed(2)}</div>
+                    </div>
+                  ` : ''}
+                ` : ''}
+                ${currentWeek.grossPay > 0 ? `
+                  <div class="summary-item">
+                    <div class="summary-label">Avg Gross/Hr</div>
+                    <div class="summary-value rate">$${avgGrossHourly}</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-label">Avg Net/Hr</div>
+                    <div class="summary-value rate">$${avgNetHourly}</div>
                   </div>
                 ` : ''}
-              ` : ''}
+              </div>
             </div>
           </div>
         `;
@@ -1542,6 +1628,9 @@
         }
         
         const numShows = lastPaidWeekGroups.length;
+        
+        const avgGrossHourly = lastPaidWeek.grossPay > 0 ? (lastPaidWeek.grossPay / lastPaidWeek.hours).toFixed(2) : '0.00';
+        const avgNetHourly = lastPaidWeek.netPay > 0 ? (lastPaidWeek.netPay / lastPaidWeek.hours).toFixed(2) : '0.00';
         
         html += `
           <div class="weekly-summary" style="margin-top: 16px;">
@@ -1622,7 +1711,126 @@
     // Toggle backup menu
     function toggleBackupMenu() {
       const menu = document.getElementById('backupMenu');
-      menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      const isOpening = menu.style.display === 'none';
+      menu.style.display = isOpening ? 'block' : 'none';
+      
+      if (isOpening) {
+        updateCSVTrackingInfo();
+      }
+    }
+    
+    // Update CSV tracking info in menu
+    function updateCSVTrackingInfo() {
+      const container = document.getElementById('csvTrackingInfo');
+      let html = '';
+      
+      // Get tracking data
+      const lastLoad = localStorage.getItem('payroll-last-load');
+      const lastSave = localStorage.getItem('payroll-last-save');
+      
+      if (lastLoad) {
+        try {
+          const loadInfo = JSON.parse(lastLoad);
+          const loadDate = new Date(loadInfo.timestamp);
+          const timeAgo = getTimeAgo(loadDate);
+          
+          // Calculate changes since load
+          const loadedEntries = JSON.parse(loadInfo.entries);
+          const changes = calculateChangesSinceLoad(loadedEntries);
+          
+          html += `
+            <div style="margin-bottom: 6px;">
+              <strong>Last CSV Load:</strong><br>
+              ${timeAgo} (${loadInfo.entryCount} entries)
+            </div>
+          `;
+          
+          if (changes.new > 0 || changes.modified > 0 || changes.deleted > 0) {
+            html += `
+              <div style="margin-bottom: 6px; color: var(--warning);">
+                <strong>Changes since load:</strong><br>
+                ${changes.new > 0 ? `+${changes.new} new ` : ''}
+                ${changes.modified > 0 ? `~${changes.modified} edited ` : ''}
+                ${changes.deleted > 0 ? `-${changes.deleted} deleted` : ''}
+              </div>
+            `;
+          }
+        } catch (e) {
+          console.error('Error parsing load info:', e);
+        }
+      }
+      
+      if (lastSave) {
+        try {
+          const saveInfo = JSON.parse(lastSave);
+          const saveDate = new Date(saveInfo.timestamp);
+          const timeAgo = getTimeAgo(saveDate);
+          
+          html += `
+            <div style="margin-bottom: 6px;">
+              <strong>Last CSV Save:</strong><br>
+              ${timeAgo} (${saveInfo.entryCount} entries)
+            </div>
+          `;
+        } catch (e) {
+          console.error('Error parsing save info:', e);
+        }
+      }
+      
+      if (!lastLoad && !lastSave) {
+        html = '<div style="color: var(--text-dim);">No CSV activity yet</div>';
+      }
+      
+      container.innerHTML = html;
+    }
+    
+    // Calculate changes since last CSV load
+    function calculateChangesSinceLoad(loadedEntries) {
+      const changes = { new: 0, modified: 0, deleted: 0 };
+      
+      // Create maps for comparison
+      const loadedMap = new Map();
+      loadedEntries.forEach(e => {
+        loadedMap.set(e.date + '-' + e.show, JSON.stringify(e));
+      });
+      
+      const currentMap = new Map();
+      entries.forEach(e => {
+        currentMap.set(e.date + '-' + e.show, JSON.stringify(e));
+      });
+      
+      // Check for new and modified
+      currentMap.forEach((value, key) => {
+        if (!loadedMap.has(key)) {
+          changes.new++;
+        } else if (loadedMap.get(key) !== value) {
+          changes.modified++;
+        }
+      });
+      
+      // Check for deleted
+      loadedMap.forEach((value, key) => {
+        if (!currentMap.has(key)) {
+          changes.deleted++;
+        }
+      });
+      
+      return changes;
+    }
+    
+    // Get time ago string
+    function getTimeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      
+      if (seconds < 60) return 'Just now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      
+      return date.toLocaleDateString();
     }
     
     // Expand all weeks
@@ -1668,6 +1876,34 @@
         menu.style.display = 'none';
       }
     });
+    
+    // Toggle this week visibility
+    function toggleThisWeek() {
+      const element = document.getElementById('thisWeekDetails');
+      const arrow = document.getElementById('arrow-thisweek');
+      
+      if (element.style.display === 'none') {
+        element.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        element.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
+    
+    // Toggle all time stats visibility
+    function toggleAllTimeStats() {
+      const element = document.getElementById('allTimeStatsDetails');
+      const arrow = document.getElementById('arrow-alltimestats');
+      
+      if (element.style.display === 'none') {
+        element.style.display = 'block';
+        arrow.textContent = '▲';
+      } else {
+        element.style.display = 'none';
+        arrow.textContent = '▼';
+      }
+    }
     
     // Toggle last week visibility
     function toggleLastWeek() {
