@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payroll Tracker Pro (Cloud)</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {} }
+    }
+  </script>
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel (Compiles JSX in the browser) -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase Compat (More reliable for single-file previews than modules) -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200 font-sans min-h-screen transition-colors duration-200">
+  
+  <div id="root"></div>
+
+  <!-- Main Application Code -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    // --- Firebase Setup & Self-Hosting Fallback ---
+    let firebaseConfig = {};
+    let isPreviewEnv = false;
+
+    // Check if we are in the special preview environment
+    if (typeof __firebase_config !== 'undefined') {
+      firebaseConfig = JSON.parse(__firebase_config);
+      isPreviewEnv = true;
+    } else {
+      // -------------------------------------------------------------------
+      // SELF-HOSTING INSTRUCTIONS:
+      // Replace these dummy values with your actual Firebase Project config!
+      // -------------------------------------------------------------------
+      firebaseConfig = {
+  apiKey: "AIzaSyBMUsloYjeJELaokvxuEeIxS69Bww4MXWo",
+  authDomain: "payrolltracker-2cd27.firebaseapp.com",
+  projectId: "payrolltracker-2cd27",
+  storageBucket: "payrolltracker-2cd27.firebasestorage.app",
+  messagingSenderId: "279465001784",
+  appId: "1:279465001784:web:9c2a155ebc41c5d57db7cd",
+  measurementId: "G-9SSFXFHK4Z"
+      };
+    }
+
+    const configIsMissing = !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY";
+    
+    // Initialize Firebase (Compat Mode)
+    let auth, db;
+    if (!configIsMissing) {
+      const app = firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
+      db = firebase.firestore();
+    }
+    
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-payroll-tracker';
+
+    // --- Icons ---
+    const Icons = {
+      Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>,
+      Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
+      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
+      Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>,
+      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>,
+      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
+      Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      DollarSign: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+      AlertCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+      CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>,
+      Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+    };
+
+    // --- Utilities & Logic ---
+    const calculateHoursWorked = (startStr, endStr) => {
+      if (!startStr || !endStr) return 0;
+      const start = new Date(`2000-01-01T${startStr}`);
+      let end = new Date(`2000-01-01T${endStr}`);
+      if (end < start) end.setDate(end.getDate() + 1);
+      return (end - start) / (1000 * 60 * 60);
+    };
+
+    const calculatePayableHours = (actualHours, minPayType) => {
+      if (actualHours === 0) return 0;
+      let earned = 0;
+      if (actualHours <= 8) earned = actualHours;
+      else if (actualHours <= 12) earned = 8 + ((actualHours - 8) * 1.5);
+      else if (actualHours <= 14) earned = 8 + (4 * 1.5) + ((actualHours - 12) * 2.0);
+      else earned = 8 + (4 * 1.5) + (2 * 2.0) + ((actualHours - 14) * 3.0);
+
+      let guarantee = 0;
+      if (minPayType === '8hr') guarantee = 8;
+      if (minPayType === '10hr') guarantee = 11;
+      if (minPayType === '12hr') guarantee = 14;
+
+      return Math.max(earned, guarantee);
+    };
+
+    const formatCurrency = (num) => {
+      if (!num && num !== 0) return '';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+    };
+
+    const getWeekKey = (dateStr) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay();
+      const diff = d.getDate() - day;
+      const sunday = new Date(d.setDate(diff));
+      return sunday.toISOString().split('T')[0];
+    };
+
+    const formatDate = (dateStr) => {
+      return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
+    const parseCSVLine = (text) => {
+      let result = [];
+      let inQuotes = false;
+      let current = "";
+      for (let i = 0; i < text.length; i++) {
+        let char = text[i];
+        if (char === '"') inQuotes = !inQuotes;
+        else if (char === ',' && !inQuotes) { result.push(current); current = ""; }
+        else current += char;
+      }
+      result.push(current);
+      return result.map(s => s.replace(/^"|"$/g, '').trim());
+    };
+
+    const App = () => {
+      const [entries, setEntries] = useState([]);
+      const [user, setUser] = useState(null);
+      const [demoMode, setDemoMode] = useState(false);
+      const [theme, setTheme] = useState('dark');
+      const [formData, setFormData] = useState({
+        id: null, date: new Date().toISOString().split('T')[0],
+        show: '', position: '', startTime: '07:00', endTime: '19:00',
+        notes: '', gross: '', net: '', minPayType: '12hr'
+      });
+      const [isEditing, setIsEditing] = useState(false);
+      const [expandedWeeks, setExpandedWeeks] = useState({});
+      const [expandedShows, setExpandedShows] = useState({});
+      const [filterMode, setFilterMode] = useState('all');
+      const [showFilter, setShowFilter] = useState('All');
+      const [positionFilter, setPositionFilter] = useState('All');
+      
+      const [payModal, setPayModal] = useState({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' });
+      const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+
+      // Render Firebase setup warning if config is missing and NOT in demo mode
+      if (configIsMissing && !demoMode) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-lg border border-slate-200 dark:border-slate-800 text-center w-full">
+              <div className="text-amber-500 mb-4 flex justify-center"><Icons.AlertCircle /></div>
+              <h1 className="text-2xl font-bold mb-4">Cloud Setup Required</h1>
+              <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">
+                To use cloud syncing on your own site, you need to connect your free Firebase project.
+              </p>
+              <div className="text-left bg-slate-100 dark:bg-slate-950 p-5 rounded-xl text-sm space-y-3 mb-6">
+                <p>1. Go to <a href="https://console.firebase.google.com" target="_blank" className="text-cyan-500 hover:underline font-bold">Firebase Console</a></p>
+                <p>2. Enable <strong>Firestore</strong> and <strong>Anonymous Auth</strong>.</p>
+                <p>3. Copy the <code>firebaseConfig</code> keys into this HTML file.</p>
+              </div>
+              <button 
+                onClick={() => setDemoMode(true)}
+                className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-lg"
+              >
+                Try Local Demo Mode
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      // Initialization: Auth & Cloud Sync
+      useEffect(() => {
+        if (demoMode || !auth) {
+          // Local storage fallback for Demo Mode
+          const saved = localStorage.getItem('payroll_demo_data');
+          if (saved) setEntries(JSON.parse(saved));
+          return;
+        }
+
+        const initAuth = async () => {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            await auth.signInWithCustomToken(__initial_auth_token);
+          } else {
+            await auth.signInAnonymously();
+          }
+        };
+        initAuth();
+        const unsubscribe = auth.onAuthStateChanged(setUser);
+        return () => unsubscribe();
+      }, [demoMode]);
+
+      useEffect(() => {
+        if (!user || demoMode) return;
+        const entriesRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries');
+        const unsubscribe = entriesRef.onSnapshot((snapshot) => {
+          const loadedEntries = [];
+          snapshot.forEach(doc => loadedEntries.push({ ...doc.data(), id: Number(doc.id) }));
+          setEntries(loadedEntries);
+        }, (error) => console.error("Cloud sync error:", error));
+        
+        return () => unsubscribe();
+      }, [user, demoMode]);
+
+      // Save to local storage for Demo Mode
+      useEffect(() => {
+        if (demoMode) {
+          localStorage.setItem('payroll_demo_data', JSON.stringify(entries));
+        }
+      }, [entries, demoMode]);
+
+      useEffect(() => {
+        const savedTheme = localStorage.getItem('payroll_theme');
+        if (savedTheme) setTheme(savedTheme);
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('payroll_theme', theme);
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }, [theme]);
+
+      const showsList = useMemo(() => [...new Set(entries.map(e => e.show).filter(Boolean))], [entries]);
+      const positionsList = useMemo(() => [...new Set(entries.map(e => e.position).filter(Boolean))], [entries]);
+
+      const activeEntries = useMemo(() => {
+        return entries.filter(e => {
+          if (showFilter !== 'All' && e.show !== showFilter) return false;
+          if (positionFilter !== 'All' && e.position !== positionFilter) return false;
+          return true;
+        });
+      }, [entries, showFilter, positionFilter]);
+
+      const stats = useMemo(() => {
+        let totalGross = 0; let totalNet = 0; let totalActual = 0; let totalPayable = 0; let paidActualHours = 0;
+        const showWeekStatus = {};
+        
+        activeEntries.forEach(e => {
+          const key = `${getWeekKey(e.date)}-${e.show}`;
+          if (!showWeekStatus[key]) showWeekStatus[key] = false;
+          if ((parseFloat(e.gross) || 0) > 0 || (parseFloat(e.net) || 0) > 0) showWeekStatus[key] = true;
+        });
+
+        activeEntries.forEach(e => {
+          const key = `${getWeekKey(e.date)}-${e.show}`;
+          totalGross += parseFloat(e.gross) || 0;
+          totalNet += parseFloat(e.net) || 0;
+          totalActual += e.hours || 0;
+          totalPayable += e.payableHours || 0;
+          if (showWeekStatus[key]) paidActualHours += e.hours || 0;
+        });
+
+        const avgGrossPerHour = paidActualHours > 0 ? totalGross / paidActualHours : 0;
+        const avgNetPerHour = paidActualHours > 0 ? totalNet / paidActualHours : 0;
+        return { totalGross, totalNet, totalActual, totalPayable, avgGrossPerHour, avgNetPerHour };
+      }, [activeEntries]);
+
+      const groupedEntries = useMemo(() => {
+        const groups = {}; 
+        const sorted = [...activeEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        sorted.forEach(entry => {
+          const weekKey = getWeekKey(entry.date);
+          if (!groups[weekKey]) groups[weekKey] = { shows: {} };
+          if (!groups[weekKey].shows[entry.show]) groups[weekKey].shows[entry.show] = { entries: [], isPending: true, showGross: 0, showNet: 0 };
+          
+          groups[weekKey].shows[entry.show].entries.push(entry);
+          groups[weekKey].shows[entry.show].showGross += parseFloat(entry.gross) || 0;
+          groups[weekKey].shows[entry.show].showNet += parseFloat(entry.net) || 0;
+          
+          if ((parseFloat(entry.gross) || 0) > 0 || (parseFloat(entry.net) || 0) > 0) {
+            groups[weekKey].shows[entry.show].isPending = false;
+          }
+        });
+
+        const result = [];
+        Object.entries(groups).forEach(([weekKey, weekData]) => {
+          const filteredShows = {};
+          let hasVisibleShows = false;
+          let weekGross = 0; let weekNet = 0; let weekPaidActualHours = 0;
+
+          Object.entries(weekData.shows).forEach(([showName, showData]) => {
+            if (filterMode === 'pending' && !showData.isPending) return;
+            if (filterMode === 'paid' && showData.isPending) return;
+            
+            filteredShows[showName] = showData;
+            hasVisibleShows = true;
+
+            if (!showData.isPending) {
+              weekGross += showData.showGross;
+              weekNet += showData.showNet;
+              weekPaidActualHours += showData.entries.reduce((sum, e) => sum + (e.hours || 0), 0);
+            }
+          });
+
+          if (hasVisibleShows) {
+            const weekAvgGross = weekPaidActualHours > 0 ? weekGross / weekPaidActualHours : 0;
+            const weekAvgNet = weekPaidActualHours > 0 ? weekNet / weekPaidActualHours : 0;
+            result.push([weekKey, { shows: filteredShows, stats: { weekAvgGross, weekAvgNet } }]);
+          }
+        });
+        return result.sort((a, b) => new Date(b[0]) - new Date(a[0]));
+      }, [activeEntries, filterMode]);
+
+      const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+      const handleInputChange = (e) => setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        const actualHours = calculateHoursWorked(formData.startTime, formData.endTime);
+        const payableHours = calculatePayableHours(actualHours, formData.minPayType);
+        const newEntry = {
+          ...formData,
+          id: isEditing ? formData.id : Date.now(),
+          hours: actualHours, payableHours: payableHours,
+          gross: formData.gross ? parseFloat(formData.gross) : '',
+          net: formData.net ? parseFloat(formData.net) : ''
+        };
+
+        if (demoMode) {
+          setEntries(prev => {
+            let next = isEditing ? prev.map(ent => ent.id === newEntry.id ? newEntry : ent) : [...prev, newEntry];
+            if (newEntry.gross || newEntry.net) {
+              const weekKey = getWeekKey(newEntry.date);
+              next = next.map(ent => (ent.id !== newEntry.id && getWeekKey(ent.date) === weekKey && ent.show === newEntry.show) ? { ...ent, gross: '', net: '' } : ent);
+            }
+            return next;
+          });
+        } else {
+          const docRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(newEntry.id));
+          if (newEntry.gross || newEntry.net) {
+            const weekKey = getWeekKey(newEntry.date);
+            entries.forEach(ent => {
+              if (ent.id !== newEntry.id && getWeekKey(ent.date) === weekKey && ent.show === newEntry.show) {
+                if (ent.gross !== '' || ent.net !== '') db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(ent.id)).update({ gross: '', net: '' });
+              }
+            });
+          }
+          await docRef.set(newEntry);
+        }
+        
+        setIsEditing(false);
+        setFormData({
+          id: null, date: formData.date, show: formData.show, position: formData.position,
+          startTime: formData.startTime, endTime: formData.endTime, notes: '', gross: '', net: '', minPayType: formData.minPayType
+        });
+      };
+
+      const handleEdit = (entry) => { setFormData({ ...entry }); setIsEditing(true); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+      
+      const executeDelete = async (id) => { 
+        if (demoMode) {
+          setEntries(prev => prev.filter(e => e.id !== id));
+        } else if (user) {
+          await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(id)).delete();
+        }
+        setConfirmDeleteId(null); 
+      };
+
+      const openPayModal = (weekKey, showName) => setPayModal({ isOpen: true, weekKey, showName, gross: '', net: '' });
+      
+      const submitMarkPaid = async () => {
+        const gross = parseFloat(payModal.gross) || 0;
+        const net = parseFloat(payModal.net) || 0;
+
+        if (gross > 0 || net > 0) {
+          const groupEntries = entries.filter(e => getWeekKey(e.date) === payModal.weekKey && e.show === payModal.showName);
+          if (groupEntries.length > 0) {
+            if (demoMode) {
+              setEntries(prev => prev.map(ent => {
+                if (ent.id === groupEntries[0].id) return { ...ent, gross, net };
+                if (groupEntries.find(g => g.id === ent.id)) return { ...ent, gross: '', net: '' };
+                return ent;
+              }));
+            } else {
+              const batch = db.batch();
+              const firstRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(groupEntries[0].id));
+              batch.update(firstRef, { gross, net });
+              for (let i = 1; i < groupEntries.length; i++) {
+                const ref = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(groupEntries[i].id));
+                batch.update(ref, { gross: '', net: '' });
+              }
+              await batch.commit();
+            }
+          }
+        }
+        setPayModal({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' });
+      };
+
+      const toggleWeek = (week) => setExpandedWeeks(prev => ({ ...prev, [week]: !prev[week] }));
+      const toggleShow = (showKey) => setExpandedShows(prev => ({ ...prev, [showKey]: !prev[showKey] }));
+
+      const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const text = event.target.result;
+          const lines = text.split('\n').filter(line => line.trim() !== '');
+          const newEntries = [];
+          for (let i = 1; i < lines.length; i++) {
+            const parts = parseCSVLine(lines[i]);
+            if (parts.length >= 10) {
+              const actHrs = parseFloat(parts[8]) || 0;
+              const newEntry = {
+                id: Date.now() + i, date: parts[0], show: parts[1], position: parts[2], startTime: parts[3], endTime: parts[4], notes: parts[5],
+                gross: parseFloat(parts[6]) || '', net: parseFloat(parts[7]) || '', hours: actHrs,
+                payableHours: calculatePayableHours(actHrs, parts[9] || ''), minPayType: parts[9] || ''
+              };
+              if (demoMode) newEntries.push(newEntry);
+              else await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(newEntry.id)).set(newEntry);
+            }
+          }
+          if (demoMode) setEntries(prev => [...prev, ...newEntries]);
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      };
+
+      const exportCSV = () => {
+        let csv = 'Date,Show,Position Type,Start Time,End Time,Notes,Gross Pay,Net Pay,Hours,Min Pay Type\n';
+        entries.forEach(e => { csv += `${e.date},"${e.show || ''}","${e.position || ''}",${e.startTime},${e.endTime},"${e.notes || ''}",${e.gross || ''},${e.net || ''},${e.hours || ''},${e.minPayType || ''}\n`; });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `payroll_export_${new Date().toISOString().split('T')[0]}.csv`; link.click();
+      };
+
+      const currentActual = calculateHoursWorked(formData.startTime, formData.endTime);
+      const currentPayable = calculatePayableHours(currentActual, formData.minPayType);
+      const currentRatio = currentActual > 0 ? (currentPayable / currentActual).toFixed(2) : 0;
+
+      return (
+        <div className="w-full">
+          {payModal.isOpen && (
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm border border-slate-200 dark:border-slate-800 shadow-xl">
+                <h3 className="text-lg font-bold mb-4">Mark Paid: {payModal.showName}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Total Gross Pay</label>
+                    <input type="number" step="0.01" value={payModal.gross} onChange={e => setPayModal({...payModal, gross: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Total Net Pay (Optional)</label>
+                    <input type="number" step="0.01" value={payModal.net} onChange={e => setPayModal({...payModal, net: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setPayModal({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' })} className="flex-1 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors">Cancel</button>
+                  <button onClick={submitMarkPaid} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors">Save Pay</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <nav className="border-b dark:border-slate-800 border-slate-200 bg-white dark:bg-slate-900 sticky top-0 z-10 shadow-sm">
+            <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="bg-cyan-500 text-white p-2 rounded-lg"><Icons.DollarSign /></div>
+                <h1 className="text-xl font-bold tracking-tight">Payroll Tracker <span className="text-cyan-500">Pro</span></h1>
+              </div>
+              <div className="flex items-center gap-3">
+                {user && !demoMode && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 bg-emerald-100 dark:text-emerald-400 dark:bg-emerald-900/40 px-2.5 py-1 rounded-full font-medium" title="Synced to Cloud">
+                    <Icons.Cloud /> Saved
+                  </div>
+                )}
+                {demoMode && (
+                  <div className="hidden sm:flex items-center gap-1.5 text-xs text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/40 px-2.5 py-1 rounded-full font-medium">
+                    Demo Mode (Local)
+                  </div>
+                )}
+                <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition">{theme === 'dark' ? <Icons.Sun /> : <Icons.Moon />}</button>
+                <label className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer text-slate-500 dark:text-slate-400">
+                  <Icons.Upload />
+                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                </label>
+                <button onClick={exportCSV} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"><Icons.Download /></button>
+              </div>
+            </div>
+          </nav>
+
+          <div className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2"><Icons.Clock /> Global Overview</h2>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Total Gross</p>
+                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(stats.totalGross)}</p>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">{stats.avgGrossPerHour > 0 ? `${formatCurrency(stats.avgGrossPerHour)}/hr avg` : '---'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Total Net</p>
+                    <p className="text-xl font-bold">{formatCurrency(stats.totalNet)}</p>
+                    <p className="text-xs text-slate-500 mt-1 font-medium">{stats.avgNetPerHour > 0 ? `${formatCurrency(stats.avgNetPerHour)}/hr avg` : '---'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Actual Hours</p>
+                    <p className="text-lg font-semibold">{stats.totalActual.toFixed(1)}h</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Payable (OT)</p>
+                    <p className="text-lg font-semibold text-cyan-600 dark:text-cyan-400">{stats.totalPayable.toFixed(1)}h</p>
+                  </div>
+                </div>
+              </div>
+
+              <form onSubmit={handleSubmit} className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+                {isEditing && <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>}
+                <h2 className="text-lg font-bold mb-5">{isEditing ? 'Edit Entry' : 'New Entry'}</h2>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Date</label>
+                      <input type="date" name="date" required value={formData.date} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Guarantee</label>
+                      <select name="minPayType" value={formData.minPayType} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm">
+                        <option value="">None</option><option value="8hr">8 Hours</option><option value="10hr">10 Hours</option><option value="12hr">12 Hours</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Show / Production</label>
+                    <input type="text" name="show" required list="shows-list" value={formData.show} onChange={handleInputChange} placeholder="e.g. Dreamland" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                    <datalist id="shows-list">{showsList.map(s => <option key={s} value={s}/>)}</datalist>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Position</label>
+                    <input type="text" name="position" list="pos-list" value={formData.position} onChange={handleInputChange} placeholder="e.g. Rigging LX" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                    <datalist id="pos-list">{positionsList.map(p => <option key={p} value={p}/>)}</datalist>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Start Time</label>
+                      <input type="time" name="startTime" required value={formData.startTime} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">End Time</label>
+                      <input type="time" name="endTime" required value={formData.endTime} onChange={handleInputChange} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                    </div>
+                  </div>
+
+                  <div className="bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900 rounded-lg p-3 flex justify-between items-center">
+                    <div><span className="text-xs text-cyan-600 dark:text-cyan-400 block font-medium">Actual</span><span className="text-sm font-bold">{currentActual.toFixed(1)}h</span></div>
+                    <div className="text-center"><span className="text-xs text-cyan-600 dark:text-cyan-400 block font-medium">Ratio</span><span className="text-sm font-bold">{currentRatio}x</span></div>
+                    <div className="text-right"><span className="text-xs text-cyan-600 dark:text-cyan-400 block font-medium">Payable</span><span className="text-sm font-bold text-cyan-700 dark:text-cyan-300">{currentPayable.toFixed(1)}h</span></div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Weekly Gross Pay ($)</label>
+                      <input type="number" step="0.01" name="gross" value={formData.gross} onChange={handleInputChange} placeholder="Optional" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 mb-1">Weekly Net Pay ($)</label>
+                      <input type="number" step="0.01" name="net" value={formData.net} onChange={handleInputChange} placeholder="Optional" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Notes</label>
+                    <input type="text" name="notes" value={formData.notes} onChange={handleInputChange} placeholder="Meal penalties, kit rental..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                  </div>
+
+                  <div className="pt-4 flex gap-3">
+                    <button type="submit" className={`flex-1 py-2.5 rounded-lg text-white font-medium flex justify-center items-center gap-2 transition-colors ${isEditing ? 'bg-amber-500 hover:bg-amber-600' : 'bg-cyan-600 hover:bg-cyan-700'}`}>
+                      {isEditing ? <><Icons.CheckCircle /> Update Entry</> : <><Icons.Plus /> Add Entry</>}
+                    </button>
+                    {isEditing && <button type="button" onClick={() => {setIsEditing(false); setFormData({...formData, id: null});}} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Cancel</button>}
+                  </div>
+                </div>
+              </form>
+            </div>
+
+            <div className="lg:col-span-8 space-y-4">
+              <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-6 gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">Timesheet Log</h2>
+                  <p className="text-sm text-slate-500 mt-1">{activeEntries.length} entries shown</p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <select value={showFilter} onChange={(e) => setShowFilter(e.target.value)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500 text-slate-700 dark:text-slate-300">
+                    <option value="All">All Shows</option>{showsList.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500 text-slate-700 dark:text-slate-300">
+                    <option value="All">All Positions</option>{positionsList.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <div className="bg-white dark:bg-slate-900 rounded-lg p-1 flex border border-slate-200 dark:border-slate-800 shadow-sm ml-auto sm:ml-0">
+                    <button onClick={() => setFilterMode('all')} className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${filterMode === 'all' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>All</button>
+                    <button onClick={() => setFilterMode('pending')} className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${filterMode === 'pending' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Pending</button>
+                    <button onClick={() => setFilterMode('paid')} className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${filterMode === 'paid' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Paid</button>
+                  </div>
+                </div>
+              </div>
+
+              {groupedEntries.length === 0 ? (
+                <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
+                  <p className="text-slate-500">No entries found matching your filters.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {groupedEntries.map(([weekKey, weekData]) => {
+                    const isWeekExpanded = expandedWeeks[weekKey] !== false;
+                    const weekStartDate = new Date(weekKey + 'T12:00:00');
+                    return (
+                      <div key={weekKey} className="bg-transparent">
+                        <div onClick={() => toggleWeek(weekKey)} className="flex flex-wrap items-center justify-between cursor-pointer py-2 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg px-2 -ml-2 transition-colors mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="text-slate-400">{isWeekExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}</div>
+                            <h3 className="font-bold text-lg">Week of {weekStartDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric'})}</h3>
+                          </div>
+                          <div className="h-px bg-slate-200 dark:bg-slate-800 flex-grow mx-4 hidden sm:block"></div>
+                          {weekData.stats.weekAvgGross > 0 && (
+                            <div className="text-right text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 rounded-full shadow-sm flex gap-2 items-center">
+                              <span className="text-slate-500 hidden sm:inline">Weekly Avg:</span>
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(weekData.stats.weekAvgGross)}/hr</span>
+                              {weekData.stats.weekAvgNet > 0 && <><span className="text-slate-300 dark:text-slate-600">|</span><span className="text-slate-600 dark:text-slate-300">Net {formatCurrency(weekData.stats.weekAvgNet)}/hr</span></>}
+                            </div>
+                          )}
+                        </div>
+
+                        {isWeekExpanded && (
+                          <div className="space-y-4 pl-4 border-l-2 border-slate-200 dark:border-slate-800 ml-3">
+                            {Object.entries(weekData.shows).map(([showName, showData]) => {
+                              const showKey = `${weekKey}-${showName}`;
+                              const isShowExpanded = expandedShows[showKey] !== false;
+                              const totalShowActual = showData.entries.reduce((sum, e) => sum + (e.hours || 0), 0);
+                              const totalShowPayable = showData.entries.reduce((sum, e) => sum + (e.payableHours || 0), 0);
+                              const hourlyGross = (showData.showGross > 0 && totalShowActual > 0) ? showData.showGross / totalShowActual : 0;
+                              const hourlyNet = (showData.showNet > 0 && totalShowActual > 0) ? showData.showNet / totalShowActual : 0;
+                              
+                              return (
+                                <div key={showKey} className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm border ${showData.isPending ? 'border-amber-300 dark:border-amber-700/50' : 'border-slate-200 dark:border-slate-800'} overflow-hidden`}>
+                                  <div className={`px-5 py-4 flex flex-wrap gap-4 items-center justify-between cursor-pointer ${showData.isPending ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-slate-50 dark:bg-slate-900/50'}`} onClick={() => toggleShow(showKey)}>
+                                    <div className="flex items-center gap-3">
+                                      {isShowExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}
+                                      <div>
+                                        <h4 className="font-bold text-lg flex items-center gap-2">
+                                          {showName}
+                                          {showData.isPending && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800 flex items-center gap-1"><Icons.AlertCircle /> Pending</span>}
+                                        </h4>
+                                        <p className="text-sm text-slate-500 mt-0.5">{showData.entries.length} day(s) • {totalShowActual.toFixed(1)}h actual • <span className="text-cyan-600 dark:text-cyan-400">{totalShowPayable.toFixed(1)}h payable</span></p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-4" onClick={e => e.stopPropagation()}>
+                                      <div className="flex gap-4 sm:gap-6 text-right">
+                                        {!showData.isPending && showData.showNet > 0 && (
+                                          <div className="hidden sm:block border-r border-slate-200 dark:border-slate-700 pr-4 sm:pr-6">
+                                            <span className="block text-xs text-slate-500">Net Pay</span>
+                                            <span className="font-bold text-slate-700 dark:text-slate-300">{formatCurrency(showData.showNet)}</span>
+                                            <span className="block text-[11px] font-medium text-slate-400 mt-0.5">{formatCurrency(hourlyNet)}/hr</span>
+                                          </div>
+                                        )}
+                                        <div>
+                                          <span className="block text-xs text-slate-500">Gross Pay</span>
+                                          <span className={`font-bold ${showData.isPending ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{showData.showGross > 0 ? formatCurrency(showData.showGross) : '---'}</span>
+                                          {!showData.isPending && hourlyGross > 0 && <span className="block text-[11px] font-medium text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">{formatCurrency(hourlyGross)}/hr</span>}
+                                        </div>
+                                      </div>
+                                      {showData.isPending && <button onClick={() => openPayModal(weekKey, showName)} className="ml-2 px-3 py-1.5 text-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 rounded-lg font-medium transition-colors">Mark Paid</button>}
+                                    </div>
+                                  </div>
+
+                                  {isShowExpanded && (
+                                    <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                      {showData.entries.map((entry) => (
+                                        <div key={entry.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors flex flex-wrap md:flex-nowrap gap-4 items-center justify-between group">
+                                          <div className="flex-1 min-w-[200px]">
+                                            <div className="font-semibold text-slate-900 dark:text-slate-100">{formatDate(entry.date)}</div>
+                                            <div className="text-sm text-slate-500 mt-0.5 flex items-center gap-2">
+                                              <span>{entry.position || 'No Position'}</span>
+                                              {entry.minPayType && <span className="px-1.5 py-0.5 text-[10px] uppercase bg-slate-200 dark:bg-slate-800 rounded font-bold text-slate-600 dark:text-slate-400">{entry.minPayType}</span>}
+                                            </div>
+                                            {entry.notes && <div className="text-xs text-slate-400 mt-1 italic">"{entry.notes}"</div>}
+                                          </div>
+                                          <div className="flex items-center gap-6">
+                                            <div className="text-center w-24">
+                                              <div className="text-sm font-medium">{entry.startTime} - {entry.endTime}</div>
+                                              <div className="text-xs text-slate-500 mt-0.5">{entry.hours?.toFixed(1)}h <span className="mx-1">→</span> <span className="text-cyan-600 dark:text-cyan-400 font-bold">{entry.payableHours?.toFixed(1)}h</span></div>
+                                            </div>
+                                            <div className="flex items-center gap-2 opacity-10 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                              <button onClick={() => handleEdit(entry)} className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-950 rounded"><Icons.Edit /></button>
+                                              <button onClick={() => confirmDeleteId === entry.id ? executeDelete(entry.id) : setConfirmDeleteId(entry.id)} onMouseLeave={() => setConfirmDeleteId(null)} className={`p-1.5 rounded transition-colors ${confirmDeleteId === entry.id ? 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/60' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950'}`}>
+                                                {confirmDeleteId === entry.id ? <Icons.CheckCircle /> : <Icons.Trash />}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
