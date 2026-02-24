@@ -1,0 +1,1510 @@
+
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Payroll & Production Tracker Pro</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: {} }
+    }
+  </script>
+
+  <!-- React & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase Compat -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+  <!-- PDF.js for PDF Parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    /* Prevent body scroll when modals are open on mobile */
+    .modal-open { overflow: hidden; }
+    /* Hide scrollbar for cleaner table viewing */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-200 font-sans min-h-screen transition-colors duration-200 selection:bg-cyan-500/30 pb-20 md:pb-0">
+  
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useCallback } = React;
+
+    // --- Firebase Setup ---
+    let firebaseConfig = {};
+    let isPreviewEnv = false;
+
+    if (typeof __firebase_config !== 'undefined') {
+      firebaseConfig = JSON.parse(__firebase_config);
+      isPreviewEnv = true;
+    } else {
+      firebaseConfig = {
+        apiKey: "AIzaSyBMUsloYjeJELaokvxuEeIxS69Bww4MXWo",
+        authDomain: "payrolltracker-2cd27.firebaseapp.com",
+        projectId: "payrolltracker-2cd27",
+        storageBucket: "payrolltracker-2cd27.firebasestorage.app",
+        messagingSenderId: "279465001784",
+        appId: "1:279465001784:web:9c2a155ebc41c5d57db7cd",
+        measurementId: "G-9SSFXFHK4Z"
+      };
+    }
+
+    const configIsMissing = !firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY";
+    
+    let auth, db;
+    if (!configIsMissing) {
+      const app = firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
+      db = firebase.firestore();
+    }
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'standalone-payroll-tracker';
+
+    // --- Icons ---
+    const Icons = {
+      Sun: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.93 4.93l1.41 1.41"/><path d="M17.66 17.66l1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.93 19.07l1.41-1.41"/><path d="M17.66 6.34l1.41-1.41"/></svg>,
+      Moon: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>,
+      Download: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
+      Upload: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
+      Plus: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="5" y2="19"/><line x1="5" x2="19" y1="12" y2="12"/></svg>,
+      Edit: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+      Trash: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+      ChevronDown: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>,
+      ChevronUp: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>,
+      ChevronRight: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>,
+      Clock: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      DollarSign: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" x2="12" y1="2" y2="22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+      AlertCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>,
+      CheckCircle: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><path d="m9 11 3 3L22 4"/></svg>,
+      Cloud: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>,
+      Loader2: () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>,
+      Briefcase: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
+      Video: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>,
+      LayoutDashboard: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>,
+      History: () => <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>,
+      Search: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>,
+      Filter: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+      Eye: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>,
+      Calendar: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/></svg>,
+      FileText: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>,
+      X: () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+      Sliders: () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="4" x2="4" y1="21" y2="14"/><line x1="4" x2="4" y1="10" y2="3"/><line x1="12" x2="12" y1="21" y2="12"/><line x1="12" x2="12" y1="8" y2="3"/><line x1="20" x2="20" y1="21" y2="16"/><line x1="20" x2="20" y1="12" y2="3"/><line x1="2" x2="6" y1="14" y2="14"/><line x1="10" x2="14" y1="8" y2="8"/><line x1="18" x2="22" y1="16" y2="16"/></svg>
+    };
+
+    const KNOWN_CREW_ROLES = [
+      "Producer", "Director", "Line Producer", "Prodn Manager", "Prodn Coord",
+      "Prodn Designer", "DOP", "Key Grip", "Key Rigging Grip", "Gaffer",
+      "Rigging Gaffer", "Key Set Decorator", "Property Master", "Key Greens-Person",
+      "Head of Dept Hair", "Head of Dept Makeup", "Costume Designer", "SPFX Coord",
+      "Construction Coord", "Key Scenic Artist", "Transportation Coord",
+      "Picture Vehicle Coord", "Script Supervisor", "Sound Mixer", "Boom Operator"
+    ];
+
+    // --- Helpers ---
+    function calculateHoursWorked(startStr, endStr) {
+      if (!startStr || !endStr) return 0;
+      const start = new Date(`2000-01-01T${startStr}`);
+      let end = new Date(`2000-01-01T${endStr}`);
+      if (end < start) end.setDate(end.getDate() + 1);
+      return (end - start) / (1000 * 60 * 60);
+    }
+
+    function calculatePayableHours(actualHours, minPayType) {
+      if (actualHours === 0) return 0;
+      let earned = 0;
+      if (actualHours <= 8) earned = actualHours;
+      else if (actualHours <= 12) earned = 8 + ((actualHours - 8) * 1.5);
+      else if (actualHours <= 14) earned = 8 + (4 * 1.5) + ((actualHours - 12) * 2.0);
+      else earned = 8 + (4 * 1.5) + (2 * 2.0) + ((actualHours - 14) * 3.0);
+      let guarantee = 0;
+      if (minPayType === '8hr') guarantee = 8;
+      if (minPayType === '10hr') guarantee = 11;
+      if (minPayType === '12hr') guarantee = 14;
+      return Math.max(earned, guarantee);
+    }
+
+    function formatCurrency(num) {
+      if (!num && num !== 0) return '';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(num);
+    }
+
+    function getWeekKey(dateStr) {
+      const d = new Date(dateStr + 'T12:00:00');
+      const day = d.getDay();
+      const diff = d.getDate() - day;
+      const sunday = new Date(d.setDate(diff));
+      return sunday.toISOString().split('T')[0];
+    }
+
+    function formatDate(dateStr) {
+      if(!dateStr) return '';
+      return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }
+
+    function parseCSVLine(text) {
+      let result = [];
+      let inQuotes = false;
+      let current = "";
+      for (let i = 0; i < text.length; i++) {
+        let char = text[i];
+        if (char === '"') inQuotes = !inQuotes;
+        else if (char === ',' && !inQuotes) { result.push(current); current = ""; }
+        else current += char;
+      }
+      result.push(current);
+      return result.map(s => s.replace(/^"|"$/g, '').trim());
+    }
+
+    // --- PDF Extractor Logic ---
+    async function extractTextFromPDF(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const items = content.items.map(item => ({ str: item.str, y: item.transform[5], x: item.transform[4] }));
+        items.sort((a, b) => Math.abs(a.y - b.y) > 5 ? b.y - a.y : a.x - b.x);
+        let pageText = '';
+        let currentY = items.length > 0 ? items[0].y : 0;
+        items.forEach(item => {
+          if (Math.abs(item.y - currentY) > 5) { pageText += '\n'; currentY = item.y; }
+          pageText += item.str;
+        });
+        fullText += pageText + '\n\n';
+      }
+      return fullText;
+    }
+
+    function parseProductionsFromPDFText(text) {
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      const parsed = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.toLowerCase().startsWith('payroll email:')) {
+          const payroll = line.substring(14).trim();
+          let company = '', title = '', address = '', phone = '', email = '', startDate = '', endDate = '', rate = '';
+          let crew = {}, status = 'Upcoming';
+
+          // Forward search for dates and rate (Line i+1 and i+2)
+          let dateStr = lines[i+1] || '';
+          if (dateStr.includes(' to ')) {
+              const parts = dateStr.split(' to ');
+              startDate = parts[0].trim();
+              endDate = parts[1].trim();
+          } else { 
+              startDate = dateStr; 
+          }
+          if (lines[i+2] && !lines[i+2].toLowerCase().includes('contract')) {
+              rate = lines[i+2].trim();
+          }
+
+          // Backwards search to grab exact structured lines
+          let ptr = i - 1;
+          if (lines[ptr] && lines[ptr].startsWith('E ')) { email = lines[ptr].substring(2).trim(); ptr--; }
+          if (lines[ptr] && lines[ptr].startsWith('F ')) { ptr--; } // Skip standalone Fax lines if any
+          if (lines[ptr] && lines[ptr].startsWith('P ')) { 
+              phone = lines[ptr].replace('P ', '').split('F ')[0].replace(/\u00a0/g, '').trim(); 
+              ptr--; 
+          }
+          
+          let addr2 = lines[ptr] || ''; ptr--;
+          let addr1 = lines[ptr] || ''; ptr--;
+          address = `${addr1}, ${addr2}`.replace(/^,\s*/, '').replace(/,\s*$/, '').trim();
+          
+          company = lines[ptr] || ''; ptr--;
+          title = lines[ptr] || '';
+          
+          // Search neighborhood for all Known Crew Roles
+          let blockLines = lines.slice(Math.max(0, i - 15), Math.min(lines.length, i + 60));
+          let cLines = blockLines.map(l => l.replace(/^["',]+|["',]+$/g, '').trim());
+          for (let j = 0; j < cLines.length; j++) {
+              let cLine = cLines[j];
+              let roleFound = KNOWN_CREW_ROLES.find(r => cLine === r || cLine.startsWith(r + ',') || cLine.startsWith(r + '"') || cLine.startsWith(r + ' '));
+              if (roleFound) {
+                  let name = cLine.substring(roleFound.length).replace(/^["',:\s-]+/, '').trim();
+                  // If name is empty, it might be on the next line
+                  if (!name) {
+                      let nextIdx = j + 1;
+                      while(nextIdx < cLines.length && !cLines[nextIdx]) nextIdx++;
+                      if (nextIdx < cLines.length) {
+                          name = cLines[nextIdx].replace(/^["',]+|["',]+$/g, '').trim();
+                      }
+                  }
+                  if (name && !KNOWN_CREW_ROLES.includes(name) && !['N/A', '$N/A$', 'TBA', 'TBD', 'VARIOUS'].includes(name.toUpperCase())) {
+                      crew[roleFound] = name;
+                  }
+              }
+          }
+          
+          let cleanTitle = title.replace(/--- PAGE \d+ ---/g, '').trim();
+          if (cleanTitle.toUpperCase().startsWith('WRAPPED')) {
+              status = 'Wrapped';
+              cleanTitle = cleanTitle.replace(/^WRAPPED\s*-\s*/i, '').trim();
+          } else if (startDate && endDate) {
+              const now = new Date();
+              const startD = new Date(startDate);
+              const endD = new Date(endDate);
+              if (now < startD) status = 'Upcoming';
+              else if (now > endD) status = 'Wrapped';
+              else status = 'Shooting';
+          }
+
+          if (cleanTitle && !cleanTitle.toLowerCase().includes('current productions')) {
+            parsed.push({
+              id: Math.random().toString(36).substr(2, 9),
+              name: cleanTitle, status, company, address, phone, email, payroll, 
+              startDate, endDate, rate, crew, notes: ''
+            });
+          }
+        }
+      }
+      return parsed;
+    }
+
+    // --- Main App Component ---
+    const App = () => {
+      // Setup PDF.js
+      useEffect(() => {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        }
+      }, []);
+
+      // Navigation State
+      const [mainMode, setMainMode] = useState('timesheets'); // 'timesheets', 'productions'
+      const [prodTab, setProdTab] = useState('dashboard'); // 'dashboard', 'import', 'activity'
+
+      // Data States
+      const [entries, setEntries] = useState([]);
+      const [productions, setProductions] = useState([]);
+      const [activityLog, setActivityLog] = useState([]);
+
+      // Context States
+      const [user, setUser] = useState(null);
+      const [demoMode, setDemoMode] = useState(false);
+      const [theme, setTheme] = useState('dark');
+      const [isLoading, setIsLoading] = useState(false);
+      const [loadingText, setLoadingText] = useState('');
+
+      // Timesheet Form States
+      const [formData, setFormData] = useState({ id: null, date: new Date().toISOString().split('T')[0], show: '', position: '', startTime: '07:00', endTime: '19:00', notes: '', gross: '', net: '', minPayType: '12hr' });
+      const [isEditingEntry, setIsEditingEntry] = useState(false);
+      const [payModal, setPayModal] = useState({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' });
+      const [confirmDeleteEntryId, setConfirmDeleteEntryId] = useState(null);
+      
+      const [expandedWeeks, setExpandedWeeks] = useState({});
+      const [expandedShows, setExpandedShows] = useState({});
+      const [tsFilterMode, setTsFilterMode] = useState('all');
+      const [tsShowFilter, setTsShowFilter] = useState('All');
+      const [tsPositionFilter, setTsPositionFilter] = useState('All');
+
+      // Productions App States
+      const [prodSearchQuery, setProdSearchQuery] = useState('');
+      const [prodStatusFilter, setProdStatusFilter] = useState('All');
+      const [prodSortConfig, setProdSortConfig] = useState({ key: 'name', direction: 'asc' });
+      
+      const [visibleRoles, setVisibleRoles] = useState(() => {
+          const saved = localStorage.getItem('pt_visible_roles');
+          return saved ? JSON.parse(saved) : ['Gaffer', 'Rigging Gaffer'];
+      });
+      const [showRoleSelect, setShowRoleSelect] = useState(false);
+      const [confirmDeleteAllProd, setConfirmDeleteAllProd] = useState(false);
+
+      useEffect(() => { localStorage.setItem('pt_visible_roles', JSON.stringify(visibleRoles)); }, [visibleRoles]);
+      
+      const toggleRole = (role) => {
+          setVisibleRoles(prev => prev.includes(role) ? prev.filter(r => r !== role) : [...prev, role]);
+      };
+
+      const [viewingProd, setViewingProd] = useState(null);
+      const [isProdModalOpen, setIsProdModalOpen] = useState(false);
+      const [editingProdId, setEditingProdId] = useState(null);
+      const [prodFormData, setProdFormData] = useState({ name: '', status: 'Upcoming', crew: {}, startDate: '', endDate: '', notes: '', company: '', address: '', phone: '', email: '', rate: '', payroll: '' });
+      
+      const [scratchpadText, setScratchpadText] = useState('');
+      const [parseMessage, setParseMessage] = useState(null);
+
+      // Effect to handle body scroll lock for mobile modals
+      useEffect(() => {
+        if (viewingProd || isProdModalOpen || payModal.isOpen || confirmDeleteAllProd) {
+          document.body.classList.add('modal-open');
+        } else {
+          document.body.classList.remove('modal-open');
+        }
+      }, [viewingProd, isProdModalOpen, payModal.isOpen, confirmDeleteAllProd]);
+
+
+      // --- Initialization & Auth ---
+      useEffect(() => {
+        if (demoMode || !auth) {
+          const s1 = localStorage.getItem('pt_demo_entries'); if (s1) setEntries(JSON.parse(s1));
+          const s2 = localStorage.getItem('pt_demo_productions'); if (s2) setProductions(JSON.parse(s2));
+          const s3 = localStorage.getItem('pt_demo_activity'); if (s3) setActivityLog(JSON.parse(s3));
+          return;
+        }
+        const initAuth = async () => {
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await auth.signInWithCustomToken(__initial_auth_token);
+          else await auth.signInAnonymously();
+        };
+        initAuth();
+        const unsubscribe = auth.onAuthStateChanged(setUser);
+        return () => unsubscribe();
+      }, [demoMode]);
+
+      useEffect(() => {
+        if (!user || demoMode) return;
+        
+        // Migration helper in case older data lacked nested 'crew' object
+        const migrateProd = (p) => {
+            let updated = { ...p, crew: p.crew || {} };
+            if (p.gaffer && !updated.crew['Gaffer']) updated.crew['Gaffer'] = p.gaffer;
+            if (p.riggingGaffer && !updated.crew['Rigging Gaffer']) updated.crew['Rigging Gaffer'] = p.riggingGaffer;
+            return updated;
+        };
+
+        const sub1 = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').onSnapshot(snap => {
+          setEntries(snap.docs.map(doc => ({ ...doc.data(), id: Number(doc.id) })));
+        });
+        const sub2 = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('productions').onSnapshot(snap => {
+          setProductions(snap.docs.map(doc => migrateProd(doc.data())));
+        });
+        const sub3 = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('activity').orderBy('timestamp', 'desc').limit(50).onSnapshot(snap => {
+          setActivityLog(snap.docs.map(doc => doc.data()));
+        });
+        
+        return () => { sub1(); sub2(); sub3(); };
+      }, [user, demoMode]);
+
+      useEffect(() => {
+        if (demoMode) {
+          localStorage.setItem('pt_demo_entries', JSON.stringify(entries));
+          localStorage.setItem('pt_demo_productions', JSON.stringify(productions));
+          localStorage.setItem('pt_demo_activity', JSON.stringify(activityLog));
+        }
+      }, [entries, productions, activityLog, demoMode]);
+
+      useEffect(() => {
+        const savedTheme = localStorage.getItem('pt_theme'); if (savedTheme) setTheme(savedTheme);
+      }, []);
+
+      useEffect(() => {
+        localStorage.setItem('pt_theme', theme);
+        if (theme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+      }, [theme]);
+
+      // --- Global Helpers & Loggers ---
+      const logActivity = async (action, target, details) => {
+        const newLog = { id: crypto.randomUUID(), timestamp: new Date().toISOString(), action, target, details };
+        if (demoMode) {
+            setActivityLog(prev => [newLog, ...prev].slice(0, 50));
+        } else if (user) {
+            await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('activity').doc(newLog.id).set(newLog);
+        }
+      };
+
+      // --- Shared Computed States ---
+      const showsList = useMemo(() => {
+        const fromEntries = entries.map(e => e.show).filter(Boolean);
+        const fromPDF = productions.map(p => p.name).filter(Boolean);
+        return [...new Set([...fromEntries, ...fromPDF])].sort();
+      }, [entries, productions]);
+
+      // --- TIMESHEETS LOGIC ---
+      const positionsList = useMemo(() => [...new Set(entries.map(e => e.position).filter(Boolean))], [entries]);
+      const activeEntries = useMemo(() => entries.filter(e => (tsShowFilter === 'All' || e.show === tsShowFilter) && (tsPositionFilter === 'All' || e.position === tsPositionFilter)), [entries, tsShowFilter, tsPositionFilter]);
+      
+      const tsStats = useMemo(() => {
+        let totalGross = 0; let totalNet = 0; let totalActual = 0; let totalPayable = 0; let paidActualHours = 0;
+        const showWeekStatus = {};
+        activeEntries.forEach(e => {
+          const key = `${getWeekKey(e.date)}-${e.show}`;
+          if (!showWeekStatus[key]) showWeekStatus[key] = false;
+          if ((parseFloat(e.gross) || 0) > 0 || (parseFloat(e.net) || 0) > 0) showWeekStatus[key] = true;
+        });
+        activeEntries.forEach(e => {
+          const key = `${getWeekKey(e.date)}-${e.show}`;
+          totalGross += parseFloat(e.gross) || 0; totalNet += parseFloat(e.net) || 0;
+          totalActual += e.hours || 0; totalPayable += e.payableHours || 0;
+          if (showWeekStatus[key]) paidActualHours += e.hours || 0;
+        });
+        return { totalGross, totalNet, totalActual, totalPayable, avgGrossPerHour: paidActualHours > 0 ? totalGross / paidActualHours : 0, avgNetPerHour: paidActualHours > 0 ? totalNet / paidActualHours : 0 };
+      }, [activeEntries]);
+
+      const groupedEntries = useMemo(() => {
+        const groups = {}; 
+        const sorted = [...activeEntries].sort((a, b) => new Date(a.date) - new Date(b.date));
+        sorted.forEach(entry => {
+          const weekKey = getWeekKey(entry.date);
+          if (!groups[weekKey]) groups[weekKey] = { shows: {} };
+          if (!groups[weekKey].shows[entry.show]) groups[weekKey].shows[entry.show] = { entries: [], isPending: true, showGross: 0, showNet: 0 };
+          groups[weekKey].shows[entry.show].entries.push(entry);
+          groups[weekKey].shows[entry.show].showGross += parseFloat(entry.gross) || 0;
+          groups[weekKey].shows[entry.show].showNet += parseFloat(entry.net) || 0;
+          if ((parseFloat(entry.gross) || 0) > 0 || (parseFloat(entry.net) || 0) > 0) groups[weekKey].shows[entry.show].isPending = false;
+        });
+
+        const result = [];
+        Object.entries(groups).forEach(([weekKey, weekData]) => {
+          const filteredShows = {}; let hasVisibleShows = false; let weekGross = 0; let weekNet = 0; let weekPaidActualHours = 0;
+          Object.entries(weekData.shows).forEach(([showName, showData]) => {
+            if (tsFilterMode === 'pending' && !showData.isPending) return;
+            if (tsFilterMode === 'paid' && showData.isPending) return;
+            filteredShows[showName] = showData; hasVisibleShows = true;
+            if (!showData.isPending) { weekGross += showData.showGross; weekNet += showData.showNet; weekPaidActualHours += showData.entries.reduce((sum, e) => sum + (e.hours || 0), 0); }
+          });
+          if (hasVisibleShows) result.push([weekKey, { shows: filteredShows, stats: { weekAvgGross: weekPaidActualHours > 0 ? weekGross / weekPaidActualHours : 0, weekAvgNet: weekPaidActualHours > 0 ? weekNet / weekPaidActualHours : 0 } }]);
+        });
+        return result.sort((a, b) => new Date(b[0]) - new Date(a[0]));
+      }, [activeEntries, tsFilterMode]);
+
+      const handleTsSubmit = async (e) => {
+        e.preventDefault();
+        const actualHours = calculateHoursWorked(formData.startTime, formData.endTime);
+        const payableHours = calculatePayableHours(actualHours, formData.minPayType);
+        const newEntry = { ...formData, id: isEditingEntry ? formData.id : Date.now(), hours: actualHours, payableHours: payableHours, gross: formData.gross ? parseFloat(formData.gross) : '', net: formData.net ? parseFloat(formData.net) : '' };
+
+        if (demoMode) {
+          setEntries(prev => {
+            let next = isEditingEntry ? prev.map(ent => ent.id === newEntry.id ? newEntry : ent) : [...prev, newEntry];
+            if (newEntry.gross || newEntry.net) {
+              const weekKey = getWeekKey(newEntry.date);
+              next = next.map(ent => (ent.id !== newEntry.id && getWeekKey(ent.date) === weekKey && ent.show === newEntry.show) ? { ...ent, gross: '', net: '' } : ent);
+            }
+            return next;
+          });
+        } else {
+          const docRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(newEntry.id));
+          if (newEntry.gross || newEntry.net) {
+            const weekKey = getWeekKey(newEntry.date);
+            entries.forEach(ent => {
+              if (ent.id !== newEntry.id && getWeekKey(ent.date) === weekKey && ent.show === newEntry.show) {
+                if (ent.gross !== '' || ent.net !== '') db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(ent.id)).update({ gross: '', net: '' });
+              }
+            });
+          }
+          await docRef.set(newEntry);
+        }
+        setIsEditingEntry(false);
+        setFormData({ id: null, date: formData.date, show: formData.show, position: formData.position, startTime: formData.startTime, endTime: formData.endTime, notes: '', gross: '', net: '', minPayType: formData.minPayType });
+        logActivity(isEditingEntry ? 'Updated' : 'Added', newEntry.show, `Timesheet for ${formatDate(newEntry.date)} - ${actualHours.toFixed(1)}h`);
+      };
+
+      const handleTsDelete = async (id) => { 
+        const ent = entries.find(e => e.id === id);
+        if (demoMode) setEntries(prev => prev.filter(e => e.id !== id));
+        else if (user) await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(id)).delete();
+        if(ent) logActivity('Deleted', ent.show, `Removed timesheet for ${formatDate(ent.date)}`);
+        setConfirmDeleteEntryId(null); 
+      };
+
+      const submitMarkPaid = async () => {
+        const gross = parseFloat(payModal.gross) || 0; const net = parseFloat(payModal.net) || 0;
+        if (gross > 0 || net > 0) {
+          const groupEntries = entries.filter(e => getWeekKey(e.date) === payModal.weekKey && e.show === payModal.showName);
+          if (groupEntries.length > 0) {
+            if (demoMode) {
+              setEntries(prev => prev.map(ent => {
+                if (ent.id === groupEntries[0].id) return { ...ent, gross, net };
+                if (groupEntries.find(g => g.id === ent.id)) return { ...ent, gross: '', net: '' };
+                return ent;
+              }));
+            } else {
+              const batch = db.batch();
+              batch.update(db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(groupEntries[0].id)), { gross, net });
+              for (let i = 1; i < groupEntries.length; i++) {
+                batch.update(db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(groupEntries[i].id)), { gross: '', net: '' });
+              }
+              await batch.commit();
+            }
+            logActivity('Updated', payModal.showName, `Marked week of ${payModal.weekKey} as PAID (${formatCurrency(gross)} gross)`);
+          }
+        }
+        setPayModal({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' });
+      };
+
+      // --- PRODUCTIONS LOGIC ---
+      const prodStats = useMemo(() => ({
+        total: productions.length,
+        shooting: productions.filter(p => p.status === 'Shooting').length,
+        prep: productions.filter(p => p.status === 'Prep').length,
+        upcoming: productions.filter(p => p.status === 'Upcoming').length,
+        rumoured: productions.filter(p => p.status === 'Rumoured').length,
+      }), [productions]);
+
+      const filteredAndSortedProductions = useMemo(() => {
+          let result = [...productions].filter(prod => {
+              const sq = prodSearchQuery.toLowerCase();
+              const matchesSearch = (prod.name?.toLowerCase() || '').includes(sq) || 
+                                    (prod.company?.toLowerCase() || '').includes(sq) || 
+                                    Object.values(prod.crew || {}).some(v => v.toLowerCase().includes(sq));
+              const matchesStatus = prodStatusFilter === 'All' || prod.status === prodStatusFilter;
+              return matchesSearch && matchesStatus;
+          });
+          result.sort((a, b) => {
+              const key = prodSortConfig.key; const dir = prodSortConfig.direction === 'asc' ? -1 : 1; const invDir = prodSortConfig.direction === 'asc' ? 1 : -1;
+              if (key === 'startDate' || key === 'endDate') {
+                  let dateA = a[key] ? new Date(a[key]).getTime() : 0; let dateB = b[key] ? new Date(b[key]).getTime() : 0;
+                  if (isNaN(dateA)) dateA = 0; if (isNaN(dateB)) dateB = 0;
+                  if (dateA === 0 && dateB === 0) { let strA = (a[key] || '').toLowerCase(); let strB = (b[key] || '').toLowerCase(); return strA < strB ? dir : strA > strB ? invDir : 0; }
+                  return dateA < dateB ? dir : dateA > dateB ? invDir : 0;
+              }
+              if (key.startsWith('crew.')) {
+                  const role = key.split('.')[1];
+                  let aValue = (a.crew?.[role] || '').toLowerCase(); let bValue = (b.crew?.[role] || '').toLowerCase();
+                  return aValue < bValue ? dir : aValue > bValue ? invDir : 0;
+              }
+              let aValue = (a[key] || '').toLowerCase(); let bValue = (b[key] || '').toLowerCase();
+              return aValue < bValue ? dir : aValue > bValue ? invDir : 0;
+          });
+          return result;
+      }, [productions, prodSearchQuery, prodStatusFilter, prodSortConfig]);
+
+      const handleProdSave = async (e) => {
+          e.preventDefault();
+          const prodId = editingProdId || crypto.randomUUID();
+          const newProd = { ...prodFormData, id: prodId };
+          
+          if (demoMode) {
+              setProductions(prev => editingProdId ? prev.map(p => p.id === editingProdId ? newProd : p) : [...prev, newProd]);
+          } else if (user) {
+              await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('productions').doc(prodId).set(newProd);
+          }
+          logActivity(editingProdId ? 'Updated' : 'Added', newProd.name, editingProdId ? 'Manually edited production details.' : 'Manually added new production.');
+          setIsProdModalOpen(false); setEditingProdId(null);
+      };
+
+      const handleProdDelete = async (id) => {
+          const prodToDelete = productions.find(p => p.id === id);
+          if (demoMode) setProductions(prev => prev.filter(p => p.id !== id));
+          else if (user) await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('productions').doc(String(id)).delete();
+          if(prodToDelete) logActivity('Deleted', prodToDelete.name, 'Removed production from tracker.');
+      };
+
+      const handleConfirmDeleteAll = async () => {
+          if (demoMode) {
+              setProductions([]);
+          } else if (user) {
+              const snapshot = await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('productions').get();
+              const batch = db.batch();
+              snapshot.docs.forEach((doc) => {
+                  batch.delete(doc.ref);
+              });
+              await batch.commit();
+          }
+          logActivity('Deleted', 'All Productions', 'Wiped production database entirely.');
+          setConfirmDeleteAllProd(false);
+      };
+
+      const getStatusColor = (status) => {
+          switch (status) {
+              case 'Shooting': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30';
+              case 'Prep': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30';
+              case 'Upcoming': return 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/30';
+              case 'Rumoured': return 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30';
+              case 'Wrapped': return 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30';
+              default: return 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/30';
+          }
+      };
+
+      // --- IMPORT DATA LOGIC (HTML & PDF) ---
+      const handleParseHTML = async () => {
+          if(!scratchpadText.trim()) return;
+          setIsLoading(true); setLoadingText('Extracting HTML...');
+          try {
+              const parser = new DOMParser();
+              const docParsed = parser.parseFromString(scratchpadText, 'text/html');
+              const items = docParsed.querySelectorAll('.accordion_current .item');
+              const newProductions = []; const now = new Date(); let foundAny = false;
+
+              // 1. Current / Main Items
+              if (items.length > 0) {
+                  foundAny = true;
+                  items.forEach(item => {
+                      const titleEl = item.querySelector('.current-production-title');
+                      if (!titleEl) return;
+                      let name = titleEl.textContent.trim();
+                      let status = 'Shooting';
+                      if (name.toUpperCase().startsWith('WRAPPED')) { status = 'Wrapped'; name = name.replace(/^WRAPPED\s*-\s*/i, '').trim(); }
+                      
+                      // Extract Crew from bottom tables
+                      let crew = {};
+                      const bottomTables = item.querySelectorAll('.current-production-bottom table');
+                      bottomTables.forEach(table => {
+                          const rows = table.querySelectorAll('tr');
+                          rows.forEach(row => {
+                              const tds = row.querySelectorAll('td');
+                              if (tds.length >= 2) {
+                                  const role = tds[0].textContent.replace(/\s+/g, ' ').trim();
+                                  const val = tds[1].textContent.replace(/[\n\r]+/g, ' ').replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').trim();
+                                  if (KNOWN_CREW_ROLES.includes(role) && val && val !== 'N/A' && val !== 'TBA') {
+                                      crew[role] = val;
+                                  }
+                              }
+                          });
+                      });
+
+                      // Extract Contact Info and Dates from top tables
+                      let company = '', address = '', phone = '', email = '', payroll = '', rate = '';
+                      let startDate = '', endDate = '';
+
+                      const topTables = item.querySelectorAll('.table-headertop-content');
+                      if (topTables.length >= 1) {
+                          const tds = topTables[0].querySelectorAll('td');
+                          company = tds[0]?.textContent.trim() || '';
+                          let add1 = tds[1]?.textContent.trim() || '';
+                          let add2 = tds[2]?.textContent.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim() || '';
+                          address = `${add1}, ${add2}`.replace(/^,\s*/, '').replace(/,\s*$/, '').trim();
+                          
+                          phone = tds[3]?.textContent.replace('P ', '').split('F ')[0].replace(/\u00a0/g, '').trim() || '';
+                          email = tds[4]?.textContent.replace(/^E\s*/, '').trim() || '';
+                          payroll = tds[5]?.textContent.replace(/Payroll email:\s*/i, '').trim() || '';
+                      }
+
+                      if (topTables.length >= 2) {
+                          const times = topTables[1].querySelectorAll('time.datetime');
+                          if (times.length >= 2) {
+                              const startD = new Date(times[0].getAttribute('datetime') || times[0].textContent);
+                              const endD = new Date(times[1].getAttribute('datetime') || times[1].textContent);
+                              startDate = times[0].textContent.replace(/\s+/g, ' ').trim();
+                              endDate = times[1].textContent.replace(/\s+/g, ' ').trim();
+                              if (status !== 'Wrapped') {
+                                  if (now < startD) status = 'Upcoming';
+                                  else if (now > endD) status = 'Wrapped';
+                              }
+                          }
+                          const tds = topTables[1].querySelectorAll('td');
+                          if (tds.length >= 2) {
+                              rate = tds[1]?.textContent.trim() || '';
+                          }
+                      }
+
+                      newProductions.push({ id: crypto.randomUUID(), name, status, crew, startDate, endDate, notes: '', company, address, phone, email, rate, payroll });
+                  });
+              }
+
+              // 2. Upcoming / Rumoured
+              const unescapedText = scratchpadText.replace(/\\n/g, '\n').replace(/\\"/g, '"').replace(/\\\//g, '/').replace(/\\u([\dA-F]{4})/gi, (m, g1) => String.fromCharCode(parseInt(g1, 16)));
+              const upcomingSplit = unescapedText.split(/UPCOMING\s*\/\s*RUMOURED\s*PRODUCTIONS/i);
+              if (upcomingSplit.length > 1) {
+                  const contentAfterHeader = upcomingSplit[1].split(/<h[1-6]|<script|<footer|<\/div>\s*<\/div>\s*<\/div>/i)[0];
+                  let formattedText = contentAfterHeader.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n').replace(/<\/li>/gi, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ');
+                  const lines = formattedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+                  lines.forEach(line => {
+                      const lower = line.toLowerCase();
+                      if (lower.includes('the following are') || lower.includes('subject to change') || lower.includes('all dates') || line.length < 4 || line.length > 200) return;
+                      foundAny = true;
+                      let name = line, dateString = '';
+                      const separatorMatch = line.match(/\s+[-–—]\s+/);
+                      if (separatorMatch) { const splitIndex = separatorMatch.index; name = line.substring(0, splitIndex).trim(); dateString = line.substring(splitIndex + separatorMatch[0].length).trim(); }
+                      let startDate = '', endDate = '';
+                      if (dateString) {
+                          if (dateString.toLowerCase().includes(' to ')) { const parts = dateString.split(/\s+to\s+/i); startDate = parts[0].trim(); endDate = parts[1].trim(); } 
+                          else { startDate = dateString; }
+                      }
+                      newProductions.push({ id: crypto.randomUUID(), name, status: 'Rumoured', crew: {}, startDate, endDate, notes: '', company: 'TBD', address: '', phone: '', email: '', rate: '', payroll: '' });
+                  });
+              }
+
+              if (!foundAny) { setParseMessage({ type: 'error', text: 'No productions found. Ensure you pasted raw HTML.' }); setIsLoading(false); return; }
+              await saveParsedProductions(newProductions);
+              setScratchpadText('');
+          } catch (err) { console.error(err); setParseMessage({ type: 'error', text: 'Error parsing HTML data.' }); setIsLoading(false); }
+      };
+
+      const handleParsePDF = async (e) => {
+        const file = e.target.files[0];
+        if (!file || file.type !== 'application/pdf') return;
+        setIsLoading(true); setLoadingText('Extracting PDF text...');
+        try {
+          const text = await extractTextFromPDF(file);
+          const parsed = parseProductionsFromPDFText(text);
+          if(parsed.length === 0) { setParseMessage({ type: 'error', text: 'Could not auto-detect productions from PDF layout.' }); setIsLoading(false); return;}
+          await saveParsedProductions(parsed);
+        } catch (err) { console.error(err); setParseMessage({ type: 'error', text: 'Error reading PDF.' }); }
+        finally { setIsLoading(false); e.target.value = ''; }
+      };
+
+      const saveParsedProductions = async (newProductions) => {
+          const existingNames = new Set(productions.map(p => p.name.toLowerCase()));
+          const uniqueNewProductions = [];
+          for (const p of newProductions) {
+              if (!existingNames.has(p.name.toLowerCase())) { existingNames.add(p.name.toLowerCase()); uniqueNewProductions.push(p); }
+          }
+          if (uniqueNewProductions.length > 0) {
+              if (demoMode) { setProductions(prev => [...prev, ...uniqueNewProductions]); } 
+              else if (user) {
+                  const batch = db.batch();
+                  uniqueNewProductions.forEach(prod => {
+                      const ref = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('productions').doc(String(prod.id));
+                      batch.set(ref, prod);
+                  });
+                  await batch.commit();
+              }
+              logActivity('Imported', `${uniqueNewProductions.length} productions`, `Auto-imported: ${uniqueNewProductions.map(p => p.name).join(', ')}`);
+              setParseMessage({ type: 'success', text: `Extracted ${newProductions.length} shows. Added ${uniqueNewProductions.length} new unique shows to your database.` });
+              setProdTab('dashboard'); // Auto redirect to view them
+          } else {
+              setParseMessage({ type: 'success', text: 'No new unique productions found to import (they already exist in your list).' });
+          }
+          setIsLoading(false);
+      };
+
+      // --- Export CSVs ---
+      const exportProductionsCSV = () => {
+          let csv = 'Show Name,Status,Company,Address,Phone,Email,Payroll Email,Start Date,End Date,Rate';
+          KNOWN_CREW_ROLES.forEach(role => csv += `,${role}`);
+          csv += '\n';
+
+          filteredAndSortedProductions.forEach(p => {
+              const escapeCSV = (str) => `"${(str || '').toString().replace(/"/g, '""')}"`;
+              let row = [
+                  p.name, p.status, p.company, p.address, p.phone, p.email, p.payroll,
+                  p.startDate, p.endDate, p.rate
+              ];
+              KNOWN_CREW_ROLES.forEach(role => {
+                  row.push(p.crew?.[role] || '');
+              });
+              csv += row.map(escapeCSV).join(',') + '\n';
+          });
+
+          const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+          const link = document.createElement('a'); 
+          link.href = URL.createObjectURL(blob); 
+          link.download = `productions_export_${new Date().toISOString().split('T')[0]}.csv`; 
+          link.click();
+          logActivity('Exported', 'Productions CSV', `Exported ${filteredAndSortedProductions.length} productions to CSV`);
+      };
+
+      const exportTimesheetsCSV = () => {
+        let csv = 'Date,Show,Position Type,Start Time,End Time,Notes,Gross Pay,Net Pay,Hours,Min Pay Type\n';
+        entries.forEach(e => { csv += `${e.date},"${e.show || ''}","${e.position || ''}",${e.startTime},${e.endTime},"${e.notes || ''}",${e.gross || ''},${e.net || ''},${e.hours || ''},${e.minPayType || ''}\n`; });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `timesheets_export_${new Date().toISOString().split('T')[0]}.csv`; link.click();
+        logActivity('Exported', 'Timesheets CSV', `Exported ${entries.length} timesheet entries to CSV`);
+      };
+
+      // --- CSV Timesheet Upload ---
+      const handleCSVUpload = async (e) => {
+        const file = e.target.files[0]; if (!file || file.type === 'application/pdf') return;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          const text = event.target.result; const lines = text.split('\n').filter(line => line.trim() !== ''); const newEntries = [];
+          for (let i = 1; i < lines.length; i++) {
+            const parts = parseCSVLine(lines[i]);
+            if (parts.length >= 10) {
+              const actHrs = parseFloat(parts[8]) || 0;
+              const newEntry = { id: Date.now() + i, date: parts[0], show: parts[1], position: parts[2], startTime: parts[3], endTime: parts[4], notes: parts[5], gross: parseFloat(parts[6]) || '', net: parseFloat(parts[7]) || '', hours: actHrs, payableHours: calculatePayableHours(actHrs, parts[9] || ''), minPayType: parts[9] || '' };
+              if (demoMode) newEntries.push(newEntry);
+              else await db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('entries').doc(String(newEntry.id)).set(newEntry);
+            }
+          }
+          if (demoMode) setEntries(prev => [...prev, ...newEntries]);
+          logActivity('Imported', 'Timesheets CSV', `Imported ${newEntries.length} timesheet entries from CSV`);
+        };
+        reader.readAsText(file); e.target.value = '';
+      };
+
+      const copyClipboard = (text, e) => {
+        const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; 
+        document.body.appendChild(textArea); textArea.focus(); textArea.select();
+        try { if (document.execCommand('copy')) { const originalText = e.target.innerText; e.target.innerText = 'Copied!'; setTimeout(() => e.target.innerText = originalText, 1500); } } catch (err) { console.error('Copy failed', err); }
+        document.body.removeChild(textArea);
+      };
+
+      if (configIsMissing && !demoMode) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-xl max-w-lg border border-slate-200 dark:border-slate-800 text-center w-full">
+              <div className="text-amber-500 mb-4 flex justify-center"><Icons.AlertCircle /></div>
+              <h1 className="text-2xl font-bold mb-4">Cloud Setup Required</h1>
+              <p className="text-slate-600 dark:text-slate-400 mb-6 text-sm">To use cloud syncing on your own site, you need to connect your free Firebase project.</p>
+              <button onClick={() => setDemoMode(true)} className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 text-white font-bold rounded-xl transition-all shadow-lg">Try Local Demo Mode</button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="w-full">
+          {/* Overlays */}
+          {isLoading && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]">
+              <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl flex flex-col items-center shadow-2xl border border-slate-200 dark:border-slate-800">
+                <div className="text-cyan-500 mb-4"><Icons.Loader2 /></div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{loadingText}</h3>
+              </div>
+            </div>
+          )}
+          
+          {confirmDeleteAllProd && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+              <div className="bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/50 rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="flex flex-col items-center text-center">
+                  <div className="bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 p-4 rounded-full mb-4">
+                    <Icons.AlertCircle />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">Delete All Productions?</h3>
+                  <p className="text-slate-500 mb-6 text-sm">This action cannot be undone. All production data and crew contacts will be permanently removed.</p>
+                  <div className="flex gap-3 w-full">
+                    <button onClick={() => setConfirmDeleteAllProd(false)} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 font-medium transition-colors">Cancel</button>
+                    <button onClick={handleConfirmDeleteAll} className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium transition-colors">Delete Everything</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Navigation */}
+          <nav className="border-b dark:border-slate-800 border-slate-200 bg-white dark:bg-slate-900 sticky top-0 z-20 shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-wrap gap-3 justify-between min-h-[64px] py-2 items-center">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="bg-cyan-600 p-2 rounded-lg text-white"><Icons.Video /></div>
+                  <h1 className="text-xl font-bold tracking-tight hidden sm:block">WorkHub <span className="text-cyan-600">Pro</span></h1>
+                </div>
+                
+                <div className="flex items-center bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shrink-0">
+                  <button onClick={() => setMainMode('timesheets')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${mainMode === 'timesheets' ? 'bg-white dark:bg-slate-800 text-cyan-600 dark:text-cyan-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>Timesheets</button>
+                  <button onClick={() => setMainMode('productions')} className={`px-4 py-1.5 rounded-md text-sm font-bold transition-all ${mainMode === 'productions' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'}`}>Productions</button>
+                </div>
+
+                <div className="flex items-center gap-2 sm:gap-4 shrink-0">
+                  <button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition text-slate-500 dark:text-slate-400"><Icons.Moon /></button>
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          {/* TIMESHEETS MAIN VIEW */}
+          {mainMode === 'timesheets' && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-in fade-in duration-300">
+               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-4 space-y-6">
+                  <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                    <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2"><Icons.Clock /> Global Overview</h2>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Total Gross</p>
+                        <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(tsStats.totalGross)}</p>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">{tsStats.avgGrossPerHour > 0 ? `${formatCurrency(tsStats.avgGrossPerHour)}/hr avg` : '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Total Net</p>
+                        <p className="text-xl font-bold">{formatCurrency(tsStats.totalNet)}</p>
+                        <p className="text-xs text-slate-500 mt-1 font-medium">{tsStats.avgNetPerHour > 0 ? `${formatCurrency(tsStats.avgNetPerHour)}/hr avg` : '---'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Actual Hours</p>
+                        <p className="text-lg font-semibold">{tsStats.totalActual.toFixed(1)}h</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Payable (OT)</p>
+                        <p className="text-lg font-semibold text-cyan-600 dark:text-cyan-400">{tsStats.totalPayable.toFixed(1)}h</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <form onSubmit={handleTsSubmit} className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 relative overflow-hidden">
+                    {isEditingEntry && <div className="absolute top-0 left-0 w-full h-1 bg-amber-500"></div>}
+                    <h2 className="text-lg font-bold mb-5">{isEditingEntry ? 'Edit Entry' : 'New Entry'}</h2>
+                    
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Date</label>
+                          <input type="date" required value={formData.date} onChange={e=>setFormData({...formData, date:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Guarantee</label>
+                          <select value={formData.minPayType} onChange={e=>setFormData({...formData, minPayType:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm">
+                            <option value="">None</option><option value="8hr">8 Hours</option><option value="10hr">10 Hours</option><option value="12hr">12 Hours</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Show / Production</label>
+                        <input type="text" required list="shows-list" value={formData.show} onChange={e=>setFormData({...formData, show:e.target.value})} placeholder="e.g. Dreamland" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                        <datalist id="shows-list">{showsList.map(s => <option key={s} value={s}/>)}</datalist>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Position</label>
+                        <input type="text" list="pos-list" value={formData.position} onChange={e=>setFormData({...formData, position:e.target.value})} placeholder="e.g. Rigging LX" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                        <datalist id="pos-list">{positionsList.map(p => <option key={p} value={p}/>)}</datalist>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Start Time</label>
+                          <input type="time" required value={formData.startTime} onChange={e=>setFormData({...formData, startTime:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">End Time</label>
+                          <input type="time" required value={formData.endTime} onChange={e=>setFormData({...formData, endTime:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                        </div>
+                      </div>
+
+                      <div className="bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-100 dark:border-cyan-900 rounded-lg p-3 flex justify-between items-center">
+                        <div><span className="text-xs text-cyan-600 dark:text-cyan-400 block font-medium">Actual</span><span className="text-sm font-bold">{calculateHoursWorked(formData.startTime, formData.endTime).toFixed(1)}h</span></div>
+                        <div className="text-right"><span className="text-xs text-cyan-600 dark:text-cyan-400 block font-medium">Payable</span><span className="text-sm font-bold text-cyan-700 dark:text-cyan-300">{calculatePayableHours(calculateHoursWorked(formData.startTime, formData.endTime), formData.minPayType).toFixed(1)}h</span></div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Weekly Gross ($)</label>
+                          <input type="number" step="0.01" value={formData.gross} onChange={e=>setFormData({...formData, gross:e.target.value})} placeholder="Optional" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Weekly Net ($)</label>
+                          <input type="number" step="0.01" value={formData.net} onChange={e=>setFormData({...formData, net:e.target.value})} placeholder="Optional" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none text-sm" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-500 mb-1">Notes</label>
+                        <input type="text" value={formData.notes} onChange={e=>setFormData({...formData, notes:e.target.value})} placeholder="Meal penalties..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 focus:ring-2 focus:ring-cyan-500 outline-none text-sm" />
+                      </div>
+
+                      <div className="pt-4 flex gap-3">
+                        <button type="submit" className={`flex-1 py-2.5 rounded-lg text-white font-medium flex justify-center items-center gap-2 transition-colors ${isEditingEntry ? 'bg-amber-500 hover:bg-amber-600' : 'bg-cyan-600 hover:bg-cyan-700'}`}>
+                          {isEditingEntry ? <><Icons.CheckCircle /> Update</> : <><Icons.Plus /> Add</>}
+                        </button>
+                        {isEditingEntry && <button type="button" onClick={() => {setIsEditingEntry(false); setFormData({...formData, id: null});}} className="px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium">Cancel</button>}
+                      </div>
+                    </div>
+                  </form>
+                </div>
+
+                <div className="lg:col-span-8 space-y-4">
+                  <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-6 gap-4">
+                    <div className="flex flex-col sm:flex-row justify-between w-full xl:w-auto items-start sm:items-center gap-4">
+                      <div>
+                        <h2 className="text-2xl font-bold flex items-center gap-2">Timesheet Log</h2>
+                        <p className="text-sm text-slate-500 mt-1">{activeEntries.length} entries shown</p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 mt-2 sm:mt-0">
+                        <label className="cursor-pointer inline-flex items-center gap-1.5 text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-medium transition-colors">
+                          <Icons.Upload /> Import CSV
+                          <input type="file" accept=".csv" className="hidden" onChange={handleCSVUpload} />
+                        </label>
+                        <button onClick={exportTimesheetsCSV} className="inline-flex items-center gap-1.5 text-sm bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-2 rounded-lg font-medium transition-colors">
+                          <Icons.Download /> Export CSV
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto">
+                      <select value={tsShowFilter} onChange={(e) => setTsShowFilter(e.target.value)} className="flex-1 sm:flex-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500 min-w-[140px]">
+                        <option value="All">All Shows</option>{showsList.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                      <select value={tsPositionFilter} onChange={(e) => setTsPositionFilter(e.target.value)} className="flex-1 sm:flex-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500 min-w-[140px]">
+                        <option value="All">All Positions</option>{positionsList.map(p => <option key={p} value={p}>{p}</option>)}
+                      </select>
+                      <div className="bg-white dark:bg-slate-900 rounded-lg p-1 flex border border-slate-200 dark:border-slate-800 shadow-sm overflow-x-auto w-full sm:w-auto mt-2 sm:mt-0">
+                        <button onClick={() => setTsFilterMode('all')} className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${tsFilterMode === 'all' ? 'bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white' : 'text-slate-500'}`}>All</button>
+                        <button onClick={() => setTsFilterMode('pending')} className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${tsFilterMode === 'pending' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400' : 'text-slate-500'}`}>Pending</button>
+                        <button onClick={() => setTsFilterMode('paid')} className={`flex-1 sm:flex-none px-3 py-1 text-sm font-medium rounded-md transition-colors ${tsFilterMode === 'paid' ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400' : 'text-slate-500'}`}>Paid</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {groupedEntries.length === 0 ? (
+                    <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-2xl border border-dashed border-slate-300 dark:border-slate-800">
+                      <p className="text-slate-500">No entries found matching your filters.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {groupedEntries.map(([weekKey, weekData]) => {
+                        const isWeekExpanded = expandedWeeks[weekKey] !== false;
+                        const weekStartDate = new Date(weekKey + 'T12:00:00');
+                        return (
+                          <div key={weekKey} className="bg-transparent">
+                            <div onClick={() => setExpandedWeeks(p=>({...p, [weekKey]:!p[weekKey]}))} className="flex flex-wrap items-center justify-between cursor-pointer py-2 hover:bg-slate-100 dark:hover:bg-slate-900/50 rounded-lg px-2 -ml-2 transition-colors mb-2">
+                              <div className="flex items-center gap-3">
+                                <div className="text-slate-400">{isWeekExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}</div>
+                                <h3 className="font-bold text-lg">Week of {weekStartDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric'})}</h3>
+                              </div>
+                              <div className="h-px bg-slate-200 dark:bg-slate-800 flex-grow mx-4 hidden sm:block"></div>
+                              {weekData.stats.weekAvgGross > 0 && (
+                                <div className="text-right text-xs font-medium bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-3 py-1 rounded-full shadow-sm flex gap-2 items-center mt-2 sm:mt-0">
+                                  <span className="text-slate-500 hidden sm:inline">Weekly Avg:</span>
+                                  <span className="text-emerald-600 dark:text-emerald-400 font-bold">{formatCurrency(weekData.stats.weekAvgGross)}/hr</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {isWeekExpanded && (
+                              <div className="space-y-4 pl-2 sm:pl-4 border-l-2 border-slate-200 dark:border-slate-800 sm:ml-3">
+                                {Object.entries(weekData.shows).map(([showName, showData]) => {
+                                  const showKey = `${weekKey}-${showName}`;
+                                  const isShowExpanded = expandedShows[showKey] !== false;
+                                  const totalShowActual = showData.entries.reduce((sum, e) => sum + (e.hours || 0), 0);
+                                  const totalShowPayable = showData.entries.reduce((sum, e) => sum + (e.payableHours || 0), 0);
+                                  const hourlyGross = (showData.showGross > 0 && totalShowActual > 0) ? showData.showGross / totalShowActual : 0;
+                                  
+                                  return (
+                                    <div key={showKey} className={`bg-white dark:bg-slate-900 rounded-xl shadow-sm border ${showData.isPending ? 'border-amber-300 dark:border-amber-700/50' : 'border-slate-200 dark:border-slate-800'} overflow-hidden`}>
+                                      <div className={`px-4 sm:px-5 py-4 flex flex-col sm:flex-row gap-4 sm:items-center justify-between cursor-pointer ${showData.isPending ? 'bg-amber-50 dark:bg-amber-950/20' : 'bg-slate-50 dark:bg-slate-900/50'}`} onClick={() => setExpandedShows(p=>({...p, [showKey]:!p[showKey]}))}>
+                                        <div className="flex items-start sm:items-center gap-3">
+                                          <div className="mt-1 sm:mt-0">{isShowExpanded ? <Icons.ChevronDown /> : <Icons.ChevronRight />}</div>
+                                          <div>
+                                            <h4 className="font-bold text-lg flex flex-wrap items-center gap-2">
+                                              {showName}
+                                              {showData.isPending && <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300 font-medium border border-amber-200 dark:border-amber-800 flex items-center gap-1"><Icons.AlertCircle /> Pending</span>}
+                                            </h4>
+                                            <p className="text-sm text-slate-500 mt-0.5">{showData.entries.length} day(s) • {totalShowActual.toFixed(1)}h actual • <span className="text-cyan-600 dark:text-cyan-400">{totalShowPayable.toFixed(1)}h payable</span></p>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-4 self-end sm:self-auto" onClick={e => e.stopPropagation()}>
+                                          <div className="flex gap-4 sm:gap-6 text-right">
+                                            <div>
+                                              <span className="block text-xs text-slate-500">Gross Pay</span>
+                                              <span className={`font-bold ${showData.isPending ? 'text-amber-600 dark:text-amber-500' : 'text-emerald-600 dark:text-emerald-400'}`}>{showData.showGross > 0 ? formatCurrency(showData.showGross) : '---'}</span>
+                                            </div>
+                                          </div>
+                                          {showData.isPending && <button onClick={() => setPayModal({ isOpen: true, weekKey, showName, gross: '', net: '' })} className="ml-2 px-3 py-1.5 text-sm bg-emerald-100 hover:bg-emerald-200 text-emerald-800 dark:bg-emerald-900/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 rounded-lg font-medium transition-colors">Mark Paid</button>}
+                                        </div>
+                                      </div>
+
+                                      {isShowExpanded && (
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                                          {showData.entries.map((entry) => (
+                                            <div key={entry.id} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors flex flex-col md:flex-row gap-4 md:items-center justify-between group">
+                                              <div className="flex-1">
+                                                <div className="font-semibold text-slate-900 dark:text-slate-100">{formatDate(entry.date)}</div>
+                                                <div className="text-sm text-slate-500 mt-0.5 flex items-center gap-2">
+                                                  <span>{entry.position || 'No Position'}</span>
+                                                  {entry.minPayType && <span className="px-1.5 py-0.5 text-[10px] uppercase bg-slate-200 dark:bg-slate-800 rounded font-bold text-slate-600 dark:text-slate-400">{entry.minPayType}</span>}
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center justify-between w-full md:w-auto gap-6">
+                                                <div className="text-left md:text-center min-w-[100px]">
+                                                  <div className="text-sm font-medium">{entry.startTime} - {entry.endTime}</div>
+                                                  <div className="text-xs text-slate-500 mt-0.5">{entry.hours?.toFixed(1)}h <span className="mx-1">→</span> <span className="text-cyan-600 dark:text-cyan-400 font-bold">{entry.payableHours?.toFixed(1)}h</span></div>
+                                                </div>
+                                                <div className="flex items-center gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                  <button onClick={() => {setFormData({...entry}); setIsEditingEntry(true); window.scrollTo({top:0, behavior:'smooth'});}} className="p-2 text-slate-400 hover:text-cyan-500 rounded"><Icons.Edit /></button>
+                                                  <button onClick={() => confirmDeleteEntryId === entry.id ? handleTsDelete(entry.id) : setConfirmDeleteEntryId(entry.id)} onMouseLeave={() => setConfirmDeleteEntryId(null)} className={`p-2 rounded transition-colors ${confirmDeleteEntryId === entry.id ? 'text-red-600 bg-red-100 dark:bg-red-900/60' : 'text-slate-400 hover:text-red-500'}`}>
+                                                    {confirmDeleteEntryId === entry.id ? <Icons.CheckCircle /> : <Icons.Trash />}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PRODUCTIONS MAIN VIEW */}
+          {mainMode === 'productions' && (
+            <div className="animate-in fade-in duration-300 flex flex-col">
+               <nav className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-[64px] z-10 w-full overflow-x-auto no-scrollbar">
+                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-w-max">
+                      <div className="flex gap-4">
+                          <button onClick={() => setProdTab('dashboard')} className={`flex items-center gap-2 px-3 py-3 border-b-2 transition-colors ${prodTab === 'dashboard' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}><Icons.LayoutDashboard /> Dashboard</button>
+                          <button onClick={() => setProdTab('import')} className={`flex items-center gap-2 px-3 py-3 border-b-2 transition-colors ${prodTab === 'import' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}><Icons.Download /> Import Data</button>
+                          <button onClick={() => setProdTab('activity')} className={`flex items-center gap-2 px-3 py-3 border-b-2 transition-colors ${prodTab === 'activity' ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 font-bold' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}><Icons.History /> Activity</button>
+                      </div>
+                  </div>
+              </nav>
+
+              <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+                
+                {/* --- Dashboard Tab --- */}
+                {prodTab === 'dashboard' && (
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                        {[
+                          { label: 'Total Tracked', value: prodStats.total, icon: 'Video', color: 'text-indigo-500 dark:text-indigo-400' },
+                          { label: 'Shooting', value: prodStats.shooting, icon: 'CheckCircle', color: 'text-emerald-500 dark:text-emerald-400' },
+                          { label: 'In Prep', value: prodStats.prep, icon: 'Calendar', color: 'text-amber-500 dark:text-amber-400' },
+                          { label: 'Upcoming', value: prodStats.upcoming, icon: 'Calendar', color: 'text-blue-500 dark:text-blue-400' },
+                          { label: 'Rumoured', value: prodStats.rumoured, icon: 'FileText', color: 'text-purple-500 dark:text-purple-400' }
+                        ].map((stat, i) => {
+                          const IconComp = Icons[stat.icon];
+                          return (
+                            <div key={i} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex items-center justify-between shadow-sm">
+                                <div><p className="text-sm text-slate-500">{stat.label}</p><p className="text-2xl font-bold mt-1">{stat.value}</p></div>
+                                <div className={`p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 hidden sm:block ${stat.color}`}><IconComp /></div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 space-y-4 shadow-sm">
+                        <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
+                            <div className="flex-1 w-full relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Search /></span>
+                                <input type="text" placeholder="Search shows, crew names, company..." value={prodSearchQuery} onChange={e=>setProdSearchQuery(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all text-sm" />
+                            </div>
+                            <div className="flex gap-2 w-full lg:w-auto">
+                              <button onClick={() => {setProdFormData({ name: '', status: 'Upcoming', crew: {}, startDate: '', endDate: '', notes: '', company: '', address: '', phone: '', email: '', rate: '', payroll: '' }); setEditingProdId(null); setIsProdModalOpen(true);}} className="flex-1 lg:flex-none flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors">
+                                  <Icons.Plus /> <span>Add Show</span>
+                              </button>
+                              <button onClick={exportProductionsCSV} title="Export Data to CSV" className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg transition-colors flex items-center justify-center gap-2">
+                                  <Icons.Download /> <span className="hidden sm:inline">Export</span>
+                              </button>
+                              <button onClick={() => setConfirmDeleteAllProd(true)} title="Delete All Data" className="px-4 py-2 bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60 text-red-700 dark:text-red-400 rounded-lg transition-colors flex items-center justify-center gap-2">
+                                  <Icons.Trash /> <span className="hidden sm:inline">Clear All</span>
+                              </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><Icons.Filter /></span>
+                                <select value={prodStatusFilter} onChange={e=>setProdStatusFilter(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg pl-10 pr-8 py-2 appearance-none focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                                    <option value="All">All Statuses</option><option value="Upcoming">Upcoming</option><option value="Prep">Prep</option><option value="Shooting">Shooting</option><option value="Wrapped">Wrapped</option><option value="Rumoured">Rumoured</option>
+                                </select>
+                            </div>
+                            
+                            <div className="relative">
+                                <button onClick={() => setShowRoleSelect(!showRoleSelect)} className="flex items-center justify-between w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    <div className="flex items-center gap-2"><Icons.Sliders /> Display Crew Columns ({visibleRoles.length})</div>
+                                    <Icons.ChevronDown />
+                                </button>
+                                {showRoleSelect && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowRoleSelect(false)}></div>
+                                        <div className="absolute top-full right-0 sm:left-0 mt-2 w-full sm:w-64 max-h-64 overflow-y-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 p-2">
+                                            {KNOWN_CREW_ROLES.map(role => (
+                                                <label key={role} className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer text-sm font-medium">
+                                                    <input type="checkbox" checked={visibleRoles.includes(role)} onChange={() => toggleRole(role)} className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500" />
+                                                    {role}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto w-full pb-4">
+                            <table className="w-full text-left border-collapse min-w-max">
+                                <thead>
+                                    <tr className="bg-slate-50 dark:bg-slate-950/50 border-b border-slate-200 dark:border-slate-800">
+                                        <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 select-none whitespace-nowrap" onClick={() => setProdSortConfig(p => ({key: 'name', direction: p.key==='name'&&p.direction==='asc'?'desc':'asc'}))}>
+                                            <div className="flex items-center gap-1">Show Name {prodSortConfig.key === 'name' && (prodSortConfig.direction === 'asc' ? <Icons.ChevronUp /> : <Icons.ChevronDown />)}</div>
+                                        </th>
+                                        <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 select-none whitespace-nowrap" onClick={() => setProdSortConfig(p => ({key: 'status', direction: p.key==='status'&&p.direction==='asc'?'desc':'asc'}))}>
+                                            <div className="flex items-center gap-1">Status {prodSortConfig.key === 'status' && (prodSortConfig.direction === 'asc' ? <Icons.ChevronUp /> : <Icons.ChevronDown />)}</div>
+                                        </th>
+                                        
+                                        {visibleRoles.map(role => (
+                                            <th key={role} className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 select-none whitespace-nowrap" onClick={() => setProdSortConfig(p => ({key: `crew.${role}`, direction: p.key===`crew.${role}`&&p.direction==='asc'?'desc':'asc'}))}>
+                                                <div className="flex items-center gap-1">{role} {prodSortConfig.key === `crew.${role}` && (prodSortConfig.direction === 'asc' ? <Icons.ChevronUp /> : <Icons.ChevronDown />)}</div>
+                                            </th>
+                                        ))}
+
+                                        <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 select-none whitespace-nowrap" onClick={() => setProdSortConfig(p => ({key: 'startDate', direction: p.key==='startDate'&&p.direction==='asc'?'desc':'asc'}))}>
+                                            <div className="flex items-center gap-1">Start Date {prodSortConfig.key === 'startDate' && (prodSortConfig.direction === 'asc' ? <Icons.ChevronUp /> : <Icons.ChevronDown />)}</div>
+                                        </th>
+                                        <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 select-none whitespace-nowrap" onClick={() => setProdSortConfig(p => ({key: 'endDate', direction: p.key==='endDate'&&p.direction==='asc'?'desc':'asc'}))}>
+                                            <div className="flex items-center gap-1">End Date {prodSortConfig.key === 'endDate' && (prodSortConfig.direction === 'asc' ? <Icons.ChevronUp /> : <Icons.ChevronDown />)}</div>
+                                        </th>
+                                        <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                                    {filteredAndSortedProductions.length === 0 && (
+                                      <tr><td colSpan={5 + visibleRoles.length} className="px-6 py-12 text-center text-slate-500">No productions found.</td></tr>
+                                    )}
+                                    {filteredAndSortedProductions.map(prod => (
+                                        <tr key={prod.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+                                            <td className="px-6 py-4 max-w-[200px] sm:max-w-xs">
+                                                <button onClick={() => setViewingProd(prod)} className="font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 transition-colors text-left line-clamp-2">{prod.name}</button>
+                                                {prod.rate && <div className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 mt-1 font-medium"><Icons.DollarSign /> {prod.rate}</div>}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap"><span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(prod.status)}`}>{prod.status}</span></td>
+                                            
+                                            {visibleRoles.map(role => (
+                                                <td key={role} className="px-6 py-4 text-slate-700 dark:text-slate-300 text-sm whitespace-nowrap">
+                                                    {prod.crew?.[role] || '—'}
+                                                </td>
+                                            ))}
+
+                                            <td className="px-6 py-4 text-slate-500 text-sm whitespace-nowrap">{prod.startDate || '—'}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-sm whitespace-nowrap">{prod.endDate || '—'}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => setViewingProd(prod)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-md transition-colors"><Icons.Eye /></button>
+                                                    <button onClick={() => {setProdFormData({...prod, crew: prod.crew || {}}); setEditingProdId(prod.id); setIsProdModalOpen(true);}} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-md transition-colors"><Icons.Edit /></button>
+                                                    <button onClick={() => handleProdDelete(prod.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/40 rounded-md transition-colors"><Icons.Trash /></button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* --- Import Tab --- */}
+                {prodTab === 'import' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+                            <h2 className="text-lg font-bold flex items-center gap-2 mb-2"><Icons.Download /> Option 1: Parse HTML</h2>
+                            <p className="text-sm text-slate-500 mb-4">Paste the raw page source code from the IATSE 873 website.</p>
+                            <textarea value={scratchpadText} onChange={e=>setScratchpadText(e.target.value)} placeholder="<div class='views-row'>..." className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg p-4 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-sm min-h-[150px] mb-4"></textarea>
+                            <button onClick={handleParseHTML} disabled={!scratchpadText.trim() || isLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-colors">Parse HTML Source</button>
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm flex flex-col items-center text-center group border-2 border-dashed hover:border-indigo-400 transition-all">
+                            <div className="bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 p-4 rounded-full mb-4 group-hover:scale-110 transition-transform"><Icons.FileText /></div>
+                            <h2 className="text-lg font-bold mb-1">Option 2: Parse PDF Document</h2>
+                            <p className="text-sm text-slate-500 mb-6">Upload the official PDF productions list to extract data instantly.</p>
+                            <label className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-xl font-medium transition-colors shadow-sm">
+                                Select PDF File
+                                <input type="file" className="hidden" accept="application/pdf" onChange={handleParsePDF} disabled={isLoading} />
+                            </label>
+                        </div>
+
+                        {parseMessage && (
+                            <div className={`p-4 rounded-xl text-sm font-medium border ${parseMessage.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' : 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-400 border-red-200 dark:border-red-500/20'}`}>
+                                {parseMessage.text}
+                            </div>
+                        )}
+                      </div>
+                      
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm">
+                          <h2 className="text-lg font-bold flex items-center gap-2 mb-6"><Icons.Plus /> Option 3: Quick Manual Add</h2>
+                          <form onSubmit={handleProdSave} className="space-y-4">
+                              <div><label className="block text-sm font-medium text-slate-500 mb-1">Show Name</label><input type="text" required value={prodFormData.name} onChange={e=>setProdFormData({...prodFormData, name:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-slate-500 mb-1">Status</label><select value={prodFormData.status} onChange={e=>setProdFormData({...prodFormData, status:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"><option value="Upcoming">Upcoming</option><option value="Prep">Prep</option><option value="Shooting">Shooting</option><option value="Wrapped">Wrapped</option><option value="Rumoured">Rumoured</option></select></div>
+                                <div><label className="block text-sm font-medium text-slate-500 mb-1">Rate / Tier</label><input type="text" value={prodFormData.rate} onChange={e=>setProdFormData({...prodFormData, rate:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-500/50 rounded-lg px-4 py-2 text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                  <div><label className="block text-sm font-medium text-slate-500 mb-1">Start Date</label><input type="text" value={prodFormData.startDate} onChange={e=>setProdFormData({...prodFormData, startDate:e.target.value})} placeholder="e.g. Jan 01 2026" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                  <div><label className="block text-sm font-medium text-slate-500 mb-1">End Date</label><input type="text" value={prodFormData.endDate} onChange={e=>setProdFormData({...prodFormData, endDate:e.target.value})} placeholder="e.g. Mar 15 2026" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                              </div>
+
+                              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
+                                  <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Crew Tracker</h3>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-64 overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 p-4 rounded-xl">
+                                      {KNOWN_CREW_ROLES.map(role => (
+                                          <div key={role}>
+                                              <label className="block text-xs font-medium text-slate-500 mb-1">{role}</label>
+                                              <input type="text" value={prodFormData.crew?.[role] || ''} onChange={e => setProdFormData({...prodFormData, crew: {...prodFormData.crew, [role]: e.target.value}})} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
+                                          </div>
+                                      ))}
+                                  </div>
+                              </div>
+
+                              <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
+                                  <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Contact Details</h3>
+                                  <div className="space-y-3">
+                                      <div><label className="block text-sm font-medium text-slate-500 mb-1">Company / Studio</label><input type="text" value={prodFormData.company} onChange={e=>setProdFormData({...prodFormData, company:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                      <div><label className="block text-sm font-medium text-slate-500 mb-1">Address</label><input type="text" value={prodFormData.address} onChange={e=>setProdFormData({...prodFormData, address:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                          <div><label className="block text-sm font-medium text-slate-500 mb-1">Phone</label><input type="text" value={prodFormData.phone} onChange={e=>setProdFormData({...prodFormData, phone:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                          <div><label className="block text-sm font-medium text-slate-500 mb-1">Email</label><input type="email" value={prodFormData.email} onChange={e=>setProdFormData({...prodFormData, email:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                      </div>
+                                      <div><label className="block text-sm font-medium text-slate-500 mb-1">Payroll Email</label><input type="email" value={prodFormData.payroll} onChange={e=>setProdFormData({...prodFormData, payroll:e.target.value})} className="w-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                                  </div>
+                              </div>
+                              <div className="pt-4 flex gap-3">
+                                  <button type="button" onClick={() => setIsProdModalOpen(false)} className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-medium py-2.5 rounded-lg transition-colors">Cancel</button>
+                                  <button type="submit" form="prodForm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors">{editingProdId ? 'Save Changes' : 'Add Production'}</button>
+                              </div>
+                          </form>
+                      </div>
+                  </div>
+                )}
+
+                {/* --- Activity Tab --- */}
+                {prodTab === 'activity' && (
+                  <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 shadow-sm min-h-[500px]">
+                      <h2 className="text-xl font-bold flex items-center gap-2 mb-6"><Icons.History /> Activity Log</h2>
+                      {activityLog.length === 0 ? (
+                          <div className="text-center py-16 text-slate-500">
+                              <p>No recent activity in your system.</p>
+                          </div>
+                      ) : (
+                          <div className="space-y-4">
+                              {activityLog.map(log => (
+                                  <div key={log.id} className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                                      <div>
+                                          <div className="flex items-center gap-2 mb-1">
+                                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${(log.action==='Added'||log.action==='Imported'||log.action==='Exported')?'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400':log.action==='Deleted'?'bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-400':'bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400'}`}>{log.action}</span>
+                                              <span className="font-bold">{log.target}</span>
+                                          </div>
+                                          <p className="text-sm text-slate-500">{log.details}</p>
+                                      </div>
+                                      <div className="text-xs text-slate-400 flex items-center gap-1 shrink-0"><Icons.Clock /> {new Date(log.timestamp).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+                )}
+              </main>
+
+              {/* Prod Modals */}
+              {viewingProd && (
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                          <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                              <h2 className="text-xl font-bold pr-4">{viewingProd.name}</h2>
+                              <button onClick={() => setViewingProd(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors p-1"><Icons.X /></button>
+                          </div>
+                          <div className="p-6 space-y-4 overflow-y-auto">
+                              <div className="flex flex-wrap gap-2 items-center mb-4">
+                                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(viewingProd.status)}`}>{viewingProd.status}</span>
+                                  <span className="text-sm font-medium flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/50 px-3 py-1 rounded-full border border-slate-200 dark:border-slate-700"><Icons.Calendar /> {viewingProd.startDate || 'TBD'} <span className="text-slate-400 mx-1">→</span> {viewingProd.endDate || 'TBD'}</span>
+                                  {viewingProd.rate && <span className="text-emerald-600 dark:text-emerald-400 text-sm font-bold flex items-center gap-1 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-500/30"><Icons.DollarSign /> {viewingProd.rate}</span>}
+                              </div>
+                              
+                              {viewingProd.crew && Object.keys(viewingProd.crew).length > 0 && (
+                                  <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-200 dark:border-slate-800">
+                                      <h3 className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-3">Crew Details</h3>
+                                      <div className="grid grid-cols-2 gap-4">
+                                          {Object.entries(viewingProd.crew).map(([role, name]) => (
+                                              <div key={role}>
+                                                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-0.5">{role}</p>
+                                                  <p className="font-medium text-sm text-slate-800 dark:text-slate-200 break-words" title={name}>{name}</p>
+                                              </div>
+                                          ))}
+                                      </div>
+                                  </div>
+                              )}
+
+                              <div className="space-y-3 pt-2">
+                                  <div><p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Company / Studio</p><p className="text-sm font-medium">{viewingProd.company || '—'}</p></div>
+                                  <div><p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Address</p><p className="text-sm font-medium">{viewingProd.address || '—'}</p></div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                      <div><p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Phone</p><p className="text-sm font-medium">{viewingProd.phone || '—'}</p></div>
+                                      <div>
+                                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Email</p>
+                                        {viewingProd.email ? <a href={`mailto:${viewingProd.email}`} className="text-indigo-600 dark:text-indigo-400 text-sm font-medium hover:underline break-all">{viewingProd.email}</a> : <p className="text-sm">—</p>}
+                                      </div>
+                                  </div>
+                                  {viewingProd.payroll && (
+                                    <div className="pt-2">
+                                      <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1 flex justify-between items-center">Payroll Email <button onClick={(e) => copyClipboard(viewingProd.payroll, e)} className="text-indigo-600 dark:text-indigo-400 hover:underline">Copy</button></p>
+                                      <p className="text-sm font-medium p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 rounded border border-emerald-100 dark:border-emerald-800/50 break-all">{viewingProd.payroll}</p>
+                                    </div>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              )}
+
+              {isProdModalOpen && (
+                  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
+                      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-2xl shadow-2xl my-8 relative flex flex-col max-h-[90vh]">
+                          <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 rounded-t-2xl shrink-0">
+                              <h2 className="text-xl font-bold">{editingProdId ? 'Edit Production' : 'Add New Production'}</h2>
+                              <button onClick={() => setIsProdModalOpen(false)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors p-1"><Icons.X /></button>
+                          </div>
+                          <div className="overflow-y-auto p-6">
+                            <form id="prodForm" onSubmit={handleProdSave} className="space-y-4">
+                                <div><label className="block text-sm font-medium text-slate-500 mb-1">Show Name</label><input type="text" required value={prodFormData.name} onChange={e=>setProdFormData({...prodFormData, name:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-medium text-slate-500 mb-1">Status</label><select value={prodFormData.status} onChange={e=>setProdFormData({...prodFormData, status:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"><option value="Upcoming">Upcoming</option><option value="Prep">Prep</option><option value="Shooting">Shooting</option><option value="Wrapped">Wrapped</option><option value="Rumoured">Rumoured</option></select></div>
+                                    <div><label className="block text-sm font-medium text-slate-500 mb-1">Rate / Tier</label><input type="text" value={prodFormData.rate} onChange={e=>setProdFormData({...prodFormData, rate:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-emerald-200 dark:border-emerald-500/50 rounded-lg px-4 py-2 text-emerald-600 dark:text-emerald-400 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-medium text-slate-500 mb-1">Start Date</label><input type="text" value={prodFormData.startDate} onChange={e=>setProdFormData({...prodFormData, startDate:e.target.value})} placeholder="e.g. Jan 01 2026" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                    <div><label className="block text-sm font-medium text-slate-500 mb-1">End Date</label><input type="text" value={prodFormData.endDate} onChange={e=>setProdFormData({...prodFormData, endDate:e.target.value})} placeholder="e.g. Mar 15 2026" className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                </div>
+
+                                <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
+                                    <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Crew Tracker</h3>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-64 overflow-y-auto pr-2 bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 p-4 rounded-xl">
+                                        {KNOWN_CREW_ROLES.map(role => (
+                                            <div key={role}>
+                                                <label className="block text-xs font-medium text-slate-500 mb-1">{role}</label>
+                                                <input type="text" value={prodFormData.crew?.[role] || ''} onChange={e => setProdFormData({...prodFormData, crew: {...prodFormData.crew, [role]: e.target.value}})} className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none text-sm" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-200 dark:border-slate-800 pt-4 mt-2">
+                                    <h3 className="text-xs font-bold text-slate-400 mb-3 uppercase tracking-wider">Contact Details</h3>
+                                    <div className="space-y-3">
+                                        <div><label className="block text-sm font-medium text-slate-500 mb-1">Company / Studio</label><input type="text" value={prodFormData.company} onChange={e=>setProdFormData({...prodFormData, company:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                        <div><label className="block text-sm font-medium text-slate-500 mb-1">Address</label><input type="text" value={prodFormData.address} onChange={e=>setProdFormData({...prodFormData, address:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div><label className="block text-sm font-medium text-slate-500 mb-1">Phone</label><input type="text" value={prodFormData.phone} onChange={e=>setProdFormData({...prodFormData, phone:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                            <div><label className="block text-sm font-medium text-slate-500 mb-1">Email</label><input type="email" value={prodFormData.email} onChange={e=>setProdFormData({...prodFormData, email:e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-700 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+                                        </div>
+                                        <div><label className="block text-sm font-medium text-slate-500 mb-1">Payroll Email</label><input type="email" value={prodFormData.payroll} onChange={e=>setProdFormData({...prodFormData, payroll:e.target.value})} className="w-full bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" /></div>
+                                    </div>
+                                </div>
+                            </form>
+                          </div>
+                          <div className="p-6 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 rounded-b-2xl shrink-0 flex gap-3">
+                              <button type="button" onClick={() => setIsProdModalOpen(false)} className="flex-1 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-medium py-2.5 rounded-lg transition-colors">Cancel</button>
+                              <button type="submit" form="prodForm" className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-lg transition-colors">{editingProdId ? 'Save Changes' : 'Add Production'}</button>
+                          </div>
+                      </div>
+                  </div>
+              )}
+            </div>
+          )}
+
+          {/* Pay Modal for Timesheets */}
+          {payModal.isOpen && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-slate-200 dark:border-slate-800">
+                <h3 className="text-lg font-bold mb-4">Mark Paid: {payModal.showName}</h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Total Gross Pay</label>
+                    <input type="number" step="0.01" value={payModal.gross} onChange={e => setPayModal({...payModal, gross: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Total Net Pay (Optional)</label>
+                    <input type="number" step="0.01" value={payModal.net} onChange={e => setPayModal({...payModal, net: e.target.value})} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-emerald-500" />
+                  </div>
+                </div>
+                <div className="flex gap-3 mt-6">
+                  <button onClick={() => setPayModal({ isOpen: false, weekKey: '', showName: '', gross: '', net: '' })} className="flex-1 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 font-medium transition-colors">Cancel</button>
+                  <button onClick={submitMarkPaid} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white font-medium hover:bg-emerald-700 transition-colors">Save Pay</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
